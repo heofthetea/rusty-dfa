@@ -1,16 +1,9 @@
 use std::collections::HashSet;
-use std::fmt::{Debug, Formatter};
-
-#[derive(Hash, PartialEq, Eq, Debug, Clone)]
-pub enum Symbol {
-    CHAR(char),
-    EPSILON,
-    EMPTY, // the empty language -> not sure if I actually need it. If not: todo rework this enum to an Optional
-}
+use std::fmt::{Debug, Display, Formatter, Write};
 
 pub trait Automaton {
     /// Construct a fully valid `Automaton` accepting exactly the passed `Symbol`.
-    fn from_symbol(c: Symbol, alphabet: HashSet<Symbol>) -> Self;
+    fn from_symbol(s: &Symbol, alphabet: HashSet<Symbol>) -> Self;
 
     /// Validate the `Automaton`
     /// returns: Ok(()) if valid, Err(reason) if not
@@ -21,6 +14,27 @@ pub trait Automaton {
     /// todo I may rework this in the future to also return where we matched or sth but for now is fine
     fn _match(&self, state: u32, input: &str) -> bool;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Hash, PartialEq, Eq, Debug, Clone)]
+pub enum Symbol {
+    CHAR(char),
+    EPSILON,
+    EMPTY, // the empty language -> not sure if I actually need it. If not: todo rework this enum to an Optional
+}
+
+impl Display for Symbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self  {
+            Symbol::CHAR(c) => {f.write_char(c.clone())}
+            Symbol::EPSILON => {f.write_str("")}
+            Symbol::EMPTY => {f.write_str("")}
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Nfa {
     states: Vec<u32>, // vec makes sense here because states are always counted upwards
@@ -63,12 +77,13 @@ impl Nfa {
 }
 
 impl Automaton for Nfa {
-    fn from_symbol(s: Symbol, alphabet: HashSet<Symbol>) -> Nfa {
+    fn from_symbol(s: &Symbol, alphabet: HashSet<Symbol>) -> Nfa {
         match s {
             Symbol::CHAR(c) => Nfa::new(
                 vec![0, 1],
                 alphabet,
-                HashSet::from_iter(vec![(0, Symbol::CHAR(c), 1)]),
+                // deliberately cloning c, because constructed NFA needs to be logically independent of original pattern
+                HashSet::from_iter(vec![(0, Symbol::CHAR(c.clone()), 1)]),
                 0,
                 HashSet::from([1]),
             ),

@@ -8,8 +8,9 @@ mod parse;
 
 fn main() {
     let alphabet = HashSet::from([Symbol::CHAR('a'), Symbol::CHAR('b'), Symbol::EMPTY, Symbol::EPSILON]);
-    let s  = Symbol::CHAR('a');
-    let nfa = Nfa::from_symbol(s, alphabet);
+    let pattern = Symbol::CHAR('a');
+    let input = "a";
+    let nfa = Nfa::from_symbol(&pattern, alphabet); //todo figure that the fuck out
     println!("{:?}", nfa);
-    println!("{}", nfa._match(0, "b"))
+    println!("Matching '{}' against '{}': {}", input, pattern, nfa._match(0, input))
 }
