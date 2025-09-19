@@ -1,18 +1,143 @@
 use std::collections::HashSet;
+use std::fmt::{Debug, Formatter};
+
+#[derive(Hash, PartialEq, Eq, Debug, Clone)]
+pub enum Symbol {
+    CHAR(char),
+    EPSILON,
+    EMPTY, // the empty language -> not sure if I actually need it. If not: todo rework this enum to an Optional
+}
+
+pub trait Automaton {
+    /// Construct a fully valid `Automaton` accepting exactly the passed `Symbol`.
+    fn from_symbol(c: Symbol, alphabet: HashSet<Symbol>) -> Self;
+
+    /// Validate the `Automaton`
+    /// returns: Ok(()) if valid, Err(reason) if not
+    fn validate(&self) -> Result<(), String>;
+
+    /// Simulate a run of `self` on the word `input`.
+    /// returns: true if `input` is accepted, false otherwise.
+    /// todo I may rework this in the future to also return where we matched or sth but for now is fine
+    fn _match(&self, state: u32, input: &str) -> bool;
+}
 
 pub struct Nfa {
-    states: Vec<u32>,
-    alphabet: HashSet<char>,
-    transitions: HashSet<(u32, char, u32)>,
+    states: Vec<u32>, // vec makes sense here because states are always counted upwards
+    alphabet: HashSet<Symbol>,
+    transitions: HashSet<(u32, Symbol, u32)>,
     q_start: u32,
-    q_accepting: Vec<u32>,
+    q_accepting: HashSet<u32>,
 }
+
+impl Nfa {
+    fn new(
+        states: Vec<u32>,
+        alphabet: HashSet<Symbol>,
+        transitions: HashSet<(u32, Symbol, u32)>,
+        q_start: u32,
+        q_accepting: HashSet<u32>,
+    ) -> Nfa {
+        let nfa = Nfa {
+            states,
+            alphabet,
+            transitions,
+            q_start,
+            q_accepting,
+        };
+        match nfa.validate() {
+            Ok(_) => {}
+            Err(e) => {
+                panic!("Requested construction of invalid NFA: {}", e)
+            }
+        };
+
+        nfa
+    }
+
+    // todo: non-determinism due to how iter() on hashsets works but okay for prototyping
+    // in order to get greedy (but deterministic) behaviour, I should probably move all hashsets to vectors
+    fn find_transitions(&self, from: u32, c: Symbol) -> Vec<(u32, Symbol, u32)> {
+        self.transitions.iter().filter(|(f, w, _)| *f == from && *w == c).cloned().collect()
+    }
+}
+
+impl Automaton for Nfa {
+    fn from_symbol(s: Symbol, alphabet: HashSet<Symbol>) -> Nfa {
+        match s {
+            Symbol::CHAR(c) => Nfa::new(
+                vec![0, 1],
+                alphabet,
+                HashSet::from_iter(vec![(0, Symbol::CHAR(c), 1)]),
+                0,
+                HashSet::from([1]),
+            ),
+            Symbol::EPSILON => Nfa::new(vec![0], alphabet, HashSet::new(), 0, HashSet::from([1])),
+            Symbol::EMPTY => Nfa::new(vec![0], alphabet, HashSet::new(), 0, HashSet::new()),
+        }
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if !self.states.contains(&self.q_start) {
+            // panic!("Illegal NFA: {}", String::from("q_0 not in Q"));
+            return Err(String::from("q_0 not in Q"));
+        }
+        Ok(())
+    }
+
+    fn _match(&self, state: u32, input: &str) -> bool {
+        if input.is_empty() {
+            return true;
+        }
+        for c in input.chars() {
+            let sc = Symbol::CHAR(c);
+            for transition in self.find_transitions(state, sc) {
+                // attempt to continue match
+                if self._match(transition.2, &input[1..]) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+}
+
+impl Debug for Nfa {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Nfa")
+         .field("Q", &self.states)
+         .field("d", &self.transitions)
+         .field("q_0", &self.q_start)
+         .field("F", &self.q_accepting)
+         .finish()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Dfa {
     states: Vec<u32>,
-    alphabet: HashSet<char>,
-    // yes, this is the only difference to Nfa, but I wanted to work with function pointers a bit so here you go
-    transitions: fn(from: u32, with: char) -> u32,
+    alphabet: HashSet<Symbol>,
+    // using a hashmap should make the thing go speeeeed
+    transitions: HashSet<(u32, Symbol), u32>,
     q_start: u32,
-    q_accepting: Vec<u32>,
+    q_accepting: HashSet<u32>,
+}
+
+impl Dfa {
+    fn new(
+        states: Vec<u32>,
+        alphabet: HashSet<Symbol>,
+        transitions: HashSet<(u32, Symbol), u32>,
+        q_start: u32,
+        q_accepting: HashSet<u32>,
+    ) -> Dfa {
+        Dfa {
+            states,
+            alphabet,
+            transitions,
+            q_start,
+            q_accepting,
+        }
+    }
 }
