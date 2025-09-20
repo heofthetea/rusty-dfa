@@ -94,9 +94,17 @@ impl Automaton for Nfa {
 
     fn validate(&self) -> Result<(), String> {
         if !self.states.contains(&self.q_start) {
-            // panic!("Illegal NFA: {}", String::from("q_0 not in Q"));
-            return Err(String::from("q_0 not in Q"));
+            return Err(String::from("q_0 ∉ Q"));
         }
+        if self.q_accepting.iter().any(|q| !self.states.contains(q)) {
+            return Err(String::from("F ⊄ Q"))
+        }
+        for transition in self.transitions.iter() {
+            if !self.states.contains(&transition.0) || !self.states.contains(&transition.2) {
+                return Err(format!("{:?} has invalid state(s)", transition))
+            }
+        }
+
         Ok(())
     }
 
@@ -107,7 +115,6 @@ impl Automaton for Nfa {
         for c in input.chars() {
             let sc = Symbol::CHAR(c);
             for transition in self.find_transitions(state, sc) {
-                // attempt to continue match
                 if self._match(transition.2, &input[1..]) {
                     return true;
                 }
