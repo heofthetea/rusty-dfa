@@ -17,3 +17,10 @@ Automata are represented as by their theoretical tuplet definition.
 
 ## Future Scope
 I may try my hands at a [Thompson NFA](https://swtch.com/~rsc/regexp/regexp1.html) at some point, to see how my approach stacks up.
+
+### Performance
+One of my goals for this project is to make it as fast as possible (at the very least the actual matching, the construction is fine if it's a bit slower).
+This shall serve as a list of things I think I could do but don't want to now (because I'm already thinking too much and make slow progress (usual me problem)):
+
+- [ ] Make transition relation a `Vec<(Set<state, symbol>, Vec<state>)>` for O(len) iterations & better lookup
+- 

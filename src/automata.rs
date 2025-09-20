@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Write};
+use crate::automata::Symbol::CHAR;
 
 pub trait Automaton {
     /// Construct a fully valid `Automaton` accepting exactly the passed `Symbol`.
@@ -15,9 +16,9 @@ pub trait Automaton {
     /// todo I may rework this in the future to also return where we matched or sth but for now is fine
     fn _match(&self, state: usize, input: &str) -> bool;
 
-    fn concat(&mut self, other: &Self) -> &Self;
-    fn union(&mut self, other: &Self) -> &Self;
-    fn klenee(&mut self, other: &Self) -> &Self;
+    fn concat(&mut self, other: Self) -> &Self;
+    fn union(&mut self, other: Self) -> &Self;
+    fn klenee(&mut self) -> &Self;
 }
 
 pub struct Nfa {
@@ -72,7 +73,7 @@ impl Automaton for Nfa {
                 // deliberately cloning c, because constructed NFA needs to be logically independent of original pattern
                 let transition: (usize, Symbol, usize) = (
                     states[0],
-                    Symbol::CHAR(c.clone()),
+                    Symbol::CHAR(*c),
                     states[1],
                 );
                 let q_start = states[0];
@@ -126,16 +127,42 @@ impl Automaton for Nfa {
         return false;
     }
 
-    fn concat(&mut self, other: &Nfa) -> &Nfa {
+    fn concat(&mut self, other: Nfa) -> &Nfa {
         self.states.extend(&other.states);
+        self.transitions.extend(other.transitions);
+        for f in self.q_accepting.iter() {
+            self.transitions.insert((*f, Symbol::EPSILON, other.q_start));
+        }
+        self.q_accepting = other.q_accepting;
+
         self
     }
 
-    fn union(&mut self, other: &Nfa) -> &Nfa {
+    fn union(&mut self, other: Nfa) -> &Nfa {
+        self.states.extend(&other.states);
+        self.transitions.extend(other.transitions);
+
+        let union_state= next_state();
+        self.states.push(union_state);
+        self.transitions.insert((union_state, Symbol::EPSILON, self.q_start));
+        self.transitions.insert((union_state, Symbol::EPSILON, other.q_start));
+        self.q_start = union_state;
+
+        self.q_accepting.extend(other.q_accepting);
+
         self
     }
 
-    fn klenee(&mut self, other: &Nfa) -> &Nfa {
+    fn klenee(&mut self) -> &Nfa {
+        let klenee_state = next_state();
+        self.states.push(klenee_state);
+        self.transitions.insert((klenee_state, Symbol::EPSILON, self.q_start));
+        self.q_start = klenee_state;
+        for f in self.q_accepting.iter() {
+            self.transitions.insert((*f, Symbol::EPSILON, self.q_start));
+        }
+        self.q_accepting.insert(self.q_start);
+
         self
     }
 }
@@ -174,6 +201,9 @@ impl Dfa {
             q_start,
             q_accepting,
         }
+    }
+    fn minimize(&self) {
+        todo!()
     }
 }
 
@@ -216,7 +246,7 @@ pub enum Symbol {
 impl Display for Symbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Symbol::CHAR(c) => f.write_char(c.clone()),
+            Symbol::CHAR(c) => f.write_char(*c),
             Symbol::EPSILON => f.write_str(""),
             Symbol::EMPTY => f.write_str(""),
         }
