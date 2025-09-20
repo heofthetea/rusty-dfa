@@ -186,7 +186,7 @@ mod test_nfa_combinations {
 
     /// GIVEN: An NFA accepting the language {"a"}
     /// WHEN: the Kleene star operation is applied
-    /// THEN: The resulting NFA accepts the language {"", "a", "aa", "aaa", ...}
+    /// THEN: The resulting NFA accepts the language {w | w \in {"a"}*}
     #[test]
     fn test_nfa_kleene() {
         reset_state_counter();
@@ -194,12 +194,12 @@ mod test_nfa_combinations {
         nfa.klenee();
         assert!(nfa.validate().is_ok());
         println!("klenee: {:?}", nfa);
-        // assert!(nfa._match(nfa.q_start, ""));
-        // assert!(nfa._match(nfa.q_start, "a"));
-        // assert!(nfa._match(nfa.q_start, "aa"));
-        // assert!(nfa._match(nfa.q_start, "aaa"));
-        // assert!(!nfa._match(nfa.q_start, "b"));
-        // assert!(!nfa._match(nfa.q_start, "ab"));
+        assert!(nfa._match(nfa.q_start, ""));
+        assert!(nfa._match(nfa.q_start, "a"));
+        assert!(nfa._match(nfa.q_start, "aa"));
+        assert!(nfa._match(nfa.q_start, "aaa"));
+        assert!(!nfa._match(nfa.q_start, "b"));
+        assert!(!nfa._match(nfa.q_start, "ab"));
         assert!(!nfa._match(nfa.q_start, "ba"));
     }
 }

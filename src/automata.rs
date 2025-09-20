@@ -17,9 +17,9 @@ pub trait Automaton {
     fn _match(&self, state: usize, input: &str) -> bool;
 
     // note: these methods are supposed to be used in a sort of Accumulator pattern
+    fn klenee(&mut self) -> &Self;
     fn concat(&mut self, other: Self) -> &Self;
     fn union(&mut self, other: Self) -> &Self;
-    fn klenee(&mut self) -> &Self;
 }
 
 pub struct Nfa {
@@ -55,7 +55,7 @@ impl Nfa {
         nfa
     }
 
-    // todo: non-determinism due to how iter() on hashsets works but okay for prototyping
+    // fixme: non-determinism due to how iter() on hashsets works but okay for prototyping
     // in order to get greedy (but deterministic) behaviour, I should probably move all hashsets to vectors
     fn find_transitions(&self, from: usize, c: Symbol) -> Vec<(usize, Symbol, usize)> {
         self.transitions
@@ -115,21 +115,34 @@ impl Automaton for Nfa {
 
     /// Simulate a run of `self` on the word `input`.
     /// Uses simple backtracking to get hold of NFAs non-determinism
-    fn _match(&self, state: usize, input: &str) -> bool {
-        if input.is_empty() {
+    fn _match(&self, state: usize, word: &str) -> bool {
+        if word.is_empty() {
             return self.q_accepting.contains(&state);
         }
-        let sc = Symbol::CHAR(input.chars().nth(0).unwrap());
+        let sc = Symbol::CHAR(word.chars().nth(0).unwrap());
         for transition in self.find_transitions(state, sc) {
             let from = match transition.1 {
                 CHAR(_) => 1,
                 Symbol::EPSILON | Symbol::EMPTY => 0,
             };
-            if self._match(transition.2, &input[from..]) {
+            if self._match(transition.2, &word[from..]) {
                 return true;
             }
         }
         return false;
+    }
+
+    fn klenee(&mut self) -> &Nfa {
+        let klenee_state = next_state();
+        self.states.push(klenee_state);
+        self.transitions.insert((klenee_state, Symbol::EPSILON, self.q_start));
+        self.q_start = klenee_state;
+        for f in self.q_accepting.iter() {
+            self.transitions.insert((*f, Symbol::EPSILON, self.q_start));
+        }
+        self.q_accepting.insert(self.q_start);
+
+        self
     }
 
     fn concat(&mut self, other: Nfa) -> &Nfa {
@@ -154,19 +167,6 @@ impl Automaton for Nfa {
         self.q_start = union_state;
 
         self.q_accepting.extend(other.q_accepting);
-
-        self
-    }
-
-    fn klenee(&mut self) -> &Nfa {
-        let klenee_state = next_state();
-        self.states.push(klenee_state);
-        self.transitions.insert((klenee_state, Symbol::EPSILON, self.q_start));
-        self.q_start = klenee_state;
-        for f in self.q_accepting.iter() {
-            self.transitions.insert((*f, Symbol::EPSILON, self.q_start));
-        }
-        self.q_accepting.insert(self.q_start);
 
         self
     }
