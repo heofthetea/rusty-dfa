@@ -45,7 +45,7 @@ pub struct Nfa {
 }
 
 impl Nfa {
-    fn new(
+    pub fn new(
         states: Vec<u32>,
         alphabet: HashSet<Symbol>,
         transitions: HashSet<(u32, Symbol, u32)>,
@@ -62,7 +62,7 @@ impl Nfa {
         match nfa.validate() {
             Ok(_) => {}
             Err(e) => {
-                panic!("Requested construction of invalid NFA: {}", e)
+                panic!("Requested construction of invalid NFA: {}", format!("{}\n{:?}", e, nfa))
             }
         };
 
@@ -87,7 +87,7 @@ impl Automaton for Nfa {
                 0,
                 HashSet::from([1]),
             ),
-            Symbol::EPSILON => Nfa::new(vec![0], alphabet, HashSet::new(), 0, HashSet::from([1])),
+            Symbol::EPSILON => Nfa::new(vec![0], alphabet, HashSet::new(), 0, HashSet::from([0])),
             Symbol::EMPTY => Nfa::new(vec![0], alphabet, HashSet::new(), 0, HashSet::new()),
         }
     }
