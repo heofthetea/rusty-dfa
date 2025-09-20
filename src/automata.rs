@@ -37,11 +37,11 @@ impl Display for Symbol {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Nfa {
-    states: Vec<u32>, // vec makes sense here because states are always counted upwards
+    pub states: Vec<u32>, // vec makes sense here because states are always counted upwards
     alphabet: HashSet<Symbol>,
-    transitions: HashSet<(u32, Symbol, u32)>,
-    q_start: u32,
-    q_accepting: HashSet<u32>,
+    pub transitions: HashSet<(u32, Symbol, u32)>,
+    pub q_start: u32,
+    pub q_accepting: HashSet<u32>,
 }
 
 impl Nfa {
