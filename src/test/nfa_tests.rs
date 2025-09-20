@@ -1,7 +1,7 @@
 #[cfg(test)]
-mod tests {
+mod test_nfa_construction {
+    use crate::automata::{Automaton, Nfa, Symbol};
     use std::collections::HashSet;
-    use crate::automata::{Nfa, Automaton, Symbol};
 
     /// GIVEN: A valid NFA with 3 states, alphabet {a, b}, and transitions that accept strings containing 'a'
     /// WHEN: Constructing the NFA with valid parameters
@@ -9,7 +9,6 @@ mod tests {
     #[test]
     fn test_valid_nfa_construction() {
         let states = vec![0, 1, 2];
-        let alphabet = HashSet::from([Symbol::CHAR('a'), Symbol::CHAR('b')]);
         let transitions = HashSet::from([
             (0, Symbol::CHAR('a'), 1),
             (0, Symbol::CHAR('b'), 0),
@@ -31,7 +30,6 @@ mod tests {
     #[should_panic(expected = "Requested construction of invalid NFA: q_0 ∉ Q")]
     fn test_invalid_start_state() {
         let states = vec![0, 1, 2];
-        let alphabet = HashSet::from([Symbol::CHAR('a')]);
         let transitions = HashSet::from([(0, Symbol::CHAR('a'), 1)]);
         let q_start = 5; // Invalid: not in states
         let q_accepting = HashSet::from([1]);
@@ -46,7 +44,6 @@ mod tests {
     #[should_panic(expected = "Requested construction of invalid NFA: F ⊄ Q")]
     fn test_invalid_accepting_states() {
         let states = vec![0, 1, 2];
-        let alphabet = HashSet::from([Symbol::CHAR('a')]);
         let transitions = HashSet::from([(0, Symbol::CHAR('a'), 1)]);
         let q_start = 0;
         let q_accepting = HashSet::from([1, 5]); // Invalid: 5 is not in states
@@ -61,7 +58,6 @@ mod tests {
     #[should_panic(expected = "has invalid state(s)")]
     fn test_invalid_transition_from_state() {
         let states = vec![0, 1, 2];
-        let alphabet = HashSet::from([Symbol::CHAR('a')]);
         let transitions = HashSet::from([
             (0, Symbol::CHAR('a'), 1),
             (5, Symbol::CHAR('a'), 2), // Invalid: from state 5 is not in states
@@ -79,7 +75,6 @@ mod tests {
     #[should_panic(expected = "has invalid state(s)")]
     fn test_invalid_transition_to_state() {
         let states = vec![0, 1, 2];
-        let alphabet = HashSet::from([Symbol::CHAR('a')]);
         let transitions = HashSet::from([
             (0, Symbol::CHAR('a'), 1),
             (1, Symbol::CHAR('a'), 7), // Invalid: to state 7 is not in states
@@ -96,7 +91,6 @@ mod tests {
     #[test]
     fn test_from_symbol_char() {
         let symbol = Symbol::CHAR('x');
-        let alphabet = HashSet::from([Symbol::CHAR('x'), Symbol::CHAR('y')]);
 
         let nfa = Nfa::from_symbol(&symbol);
 
@@ -105,10 +99,7 @@ mod tests {
         assert_eq!(nfa.states.len(), 2);
         assert_eq!(nfa.q_start, 0);
         assert_eq!(nfa.q_accepting, HashSet::from([1]));
-        assert_eq!(
-            nfa.transitions,
-            HashSet::from([(0, Symbol::CHAR('x'), 1)])
-        );
+        assert_eq!(nfa.transitions, HashSet::from([(0, Symbol::CHAR('x'), 1)]));
     }
 
     /// GIVEN: An epsilon symbol and an alphabet containing character 'a'
@@ -117,7 +108,6 @@ mod tests {
     #[test]
     fn test_from_symbol_epsilon() {
         let symbol = Symbol::EPSILON;
-        let alphabet = HashSet::from([Symbol::CHAR('a')]);
 
         let nfa = Nfa::from_symbol(&symbol);
 
@@ -130,7 +120,6 @@ mod tests {
     #[test]
     fn test_from_symbol_empty() {
         let symbol = Symbol::EMPTY;
-        let alphabet = HashSet::from([Symbol::CHAR('a')]);
 
         let nfa = Nfa::from_symbol(&symbol);
 
@@ -143,12 +132,74 @@ mod tests {
     #[test]
     fn test_minimal_valid_nfa() {
         let states = vec![0];
-        let alphabet = HashSet::from([Symbol::CHAR('a')]);
         let transitions = HashSet::new(); // No transitions
         let q_start = 0;
         let q_accepting = HashSet::from([0]); // Start state is also accepting
 
         let nfa = Nfa::new(states, transitions, q_start, q_accepting);
         assert!(nfa.validate().is_ok());
+    }
+}
+
+#[cfg(test)]
+mod test_nfa_combinations {
+    use crate::automata::{Automaton, Nfa, Symbol, reset_state_counter};
+
+    /// GIVEN: An NFA left accepting the language {"a"}
+    /// GIVEN: An NFA right accepting the language {"b"}
+    /// WHEN: the NFAs are concatenated
+    /// THEN The resulting NFA accepts the language {"ab"}
+    #[test]
+    fn test_nfa_concatenation() {
+        reset_state_counter();
+        let mut left = Nfa::from_symbol(&Symbol::CHAR('a'));
+        let right = Nfa::from_symbol(&Symbol::CHAR('b'));
+        left.concat(right);
+        assert!(left.validate().is_ok());
+        println!("concat: {:?}", left);
+        assert!(left._match(left.q_start, "ab"));
+        assert!(!left._match(left.q_start, "a"));
+        assert!(!left._match(left.q_start, "b"));
+        assert!(!left._match(left.q_start, ""));
+        assert!(!left._match(left.q_start, "abc"));
+    }
+
+    /// GIVEN: An NFA left accepting the language {"a"}
+    /// GIVEN: An NFA right accepting the language {"b"}
+    /// WHEN: the NFAs are unioned
+    /// THEN: The resulting NFA accepts the language {"a", "b"}
+    #[test]
+    fn test_nfa_union() {
+        reset_state_counter();
+        let mut left = Nfa::from_symbol(&Symbol::CHAR('a'));
+        let right = Nfa::from_symbol(&Symbol::CHAR('b'));
+        left.union(right);
+        assert!(left.validate().is_ok());
+        println!("union: {:?}", left);
+        assert!(left._match(left.q_start, "a"));
+        assert!(left._match(left.q_start, "b"));
+        assert!(!left._match(left.q_start, "ab"));
+        assert!(!left._match(left.q_start, ""));
+        assert!(!left._match(left.q_start, "c"));
+        assert!(!left._match(left.q_start, "abc"));
+    }
+
+    /// GIVEN: An NFA accepting the language {"a"}
+    /// WHEN: the Kleene star operation is applied
+    /// THEN: The resulting NFA accepts the language {"", "a", "aa", "aaa", ...}
+    #[test]
+    fn test_nfa_kleene() {
+        reset_state_counter();
+        let mut nfa = Nfa::from_symbol(&Symbol::CHAR('a'));
+        nfa.klenee();
+        assert!(nfa.validate().is_ok());
+        println!("klenee: {:?}", nfa);
+        // assert!(nfa._match(nfa.q_start, ""));
+        // assert!(nfa._match(nfa.q_start, "a"));
+        // assert!(nfa._match(nfa.q_start, "aa"));
+        // assert!(nfa._match(nfa.q_start, "aaa"));
+        // assert!(!nfa._match(nfa.q_start, "b"));
+        // assert!(!nfa._match(nfa.q_start, "ab"));
+        assert!(!nfa._match(nfa.q_start, "ba"));
     }
 }

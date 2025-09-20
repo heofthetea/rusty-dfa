@@ -16,6 +16,7 @@ pub trait Automaton {
     /// todo I may rework this in the future to also return where we matched or sth but for now is fine
     fn _match(&self, state: usize, input: &str) -> bool;
 
+    // note: these methods are supposed to be used in a sort of Accumulator pattern
     fn concat(&mut self, other: Self) -> &Self;
     fn union(&mut self, other: Self) -> &Self;
     fn klenee(&mut self) -> &Self;
@@ -59,7 +60,7 @@ impl Nfa {
     fn find_transitions(&self, from: usize, c: Symbol) -> Vec<(usize, Symbol, usize)> {
         self.transitions
             .iter()
-            .filter(|(f, w, _)| *f == from && *w == c)
+            .filter(|(f, w, _)| *f == from && (*w == c || *w == Symbol::EPSILON))
             .cloned()
             .collect()
     }
@@ -85,14 +86,14 @@ impl Automaton for Nfa {
                     q_accepting,
                 )
             }
-            Symbol::EPSILON =>  {
+            Symbol::EPSILON => {
                 let q_0 = next_state();
                 Nfa::new(vec![q_0], HashSet::new(), q_0, HashSet::from([q_0]))
-            },
+            }
             Symbol::EMPTY => {
                 let q_0 = next_state();
                 Nfa::new(vec![q_0], HashSet::new(), q_0, HashSet::new())
-            },
+            }
         }
     }
 
@@ -112,16 +113,20 @@ impl Automaton for Nfa {
         Ok(())
     }
 
+    /// Simulate a run of `self` on the word `input`.
+    /// Uses simple backtracking to get hold of NFAs non-determinism
     fn _match(&self, state: usize, input: &str) -> bool {
         if input.is_empty() {
-            return true;
+            return self.q_accepting.contains(&state);
         }
-        for c in input.chars() {
-            let sc = Symbol::CHAR(c);
-            for transition in self.find_transitions(state, sc) {
-                if self._match(transition.2, &input[1..]) {
-                    return true;
-                }
+        let sc = Symbol::CHAR(input.chars().nth(0).unwrap());
+        for transition in self.find_transitions(state, sc) {
+            let from = match transition.1 {
+                CHAR(_) => 1,
+                Symbol::EPSILON | Symbol::EMPTY => 0,
+            };
+            if self._match(transition.2, &input[from..]) {
+                return true;
             }
         }
         return false;
@@ -142,7 +147,7 @@ impl Automaton for Nfa {
         self.states.extend(&other.states);
         self.transitions.extend(other.transitions);
 
-        let union_state= next_state();
+        let union_state = next_state();
         self.states.push(union_state);
         self.transitions.insert((union_state, Symbol::EPSILON, self.q_start));
         self.transitions.insert((union_state, Symbol::EPSILON, other.q_start));
@@ -170,11 +175,11 @@ impl Automaton for Nfa {
 impl Debug for Nfa {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Nfa")
-            .field("Q", &self.states)
-            .field("d", &self.transitions)
-            .field("q_0", &self.q_start)
-            .field("F", &self.q_accepting)
-            .finish()
+         .field("Q", &self.states)
+         .field("D", &self.transitions)
+         .field("q_0", &self.q_start)
+         .field("F", &self.q_accepting)
+         .finish()
     }
 }
 
@@ -216,22 +221,30 @@ thread_local! {
 
 fn next_state() -> usize {
     STATE_GEN.with(|g| {
-        let mut id = g.borrow_mut();
-        let next_state = *id;
-        *id += 1;
-        next_state
+        let mut cell = g.borrow_mut();
+        let next = *cell;
+        *cell += 1;
+        next
     })
 }
 
 fn next_states(n: usize) -> Vec<usize> {
     let range = STATE_GEN.with(|g| {
-        let mut id = g.borrow_mut();
-        let first = *id;
-        *id += n;
+        let mut cell = g.borrow_mut();
+        let first = *cell;
+        *cell += n;
         // both bounds are inclusive
-        (first, *id - 1)
+        (first, *cell - 1)
     });
     vec![range.0, range.1]
+}
+
+/// only for testing purposes
+pub fn reset_state_counter() {
+    STATE_GEN.with(|g| {
+        let mut cell = g.borrow_mut();
+        *cell = 0usize;
+    })
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
