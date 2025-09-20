@@ -13,7 +13,11 @@ fn main() {
     let alphabet = HashSet::from([Symbol::CHAR('a'), Symbol::CHAR('b'), Symbol::EMPTY, Symbol::EPSILON]);
     let pattern = Symbol::CHAR('a');
     let input = "a";
-    let nfa = Nfa::from_symbol(&pattern, alphabet);
+    // todo get rid of alphabet
+    let nfa = Nfa::from_symbol(&pattern, alphabet.clone());
     println!("{:?}", nfa);
-    println!("Matching '{}' against '{}': {}", input, pattern, nfa._match(0, input))
+    // println!("Matching '{}' against '{}': {}", input, pattern, nfa._match(0, input));
+
+    let nfa2 = Nfa::from_symbol(&Symbol::CHAR('b'), alphabet.clone());
+    println!("{:?}", nfa2);
 }

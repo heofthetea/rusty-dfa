@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Write};
 
@@ -12,45 +13,28 @@ pub trait Automaton {
     /// Simulate a run of `self` on the word `input`.
     /// returns: true if `input` is accepted, false otherwise.
     /// todo I may rework this in the future to also return where we matched or sth but for now is fine
-    fn _match(&self, state: u32, input: &str) -> bool;
+    fn _match(&self, state: usize, input: &str) -> bool;
+
+    fn concat(&mut self, other: &Self) -> &Self;
+    fn union(&mut self, other: &Self) -> &Self;
+    fn klenee(&mut self, other: &Self) -> &Self;
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Hash, PartialEq, Eq, Debug, Clone)]
-pub enum Symbol {
-    CHAR(char),
-    EPSILON,
-    EMPTY, // the empty language -> not sure if I actually need it. If not: todo rework this enum to an Optional
-}
-
-impl Display for Symbol {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self  {
-            Symbol::CHAR(c) => {f.write_char(c.clone())}
-            Symbol::EPSILON => {f.write_str("")}
-            Symbol::EMPTY => {f.write_str("")}
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Nfa {
-    pub states: Vec<u32>, // vec makes sense here because states are always counted upwards
-    alphabet: HashSet<Symbol>,
-    pub transitions: HashSet<(u32, Symbol, u32)>,
-    pub q_start: u32,
-    pub q_accepting: HashSet<u32>,
+    pub states: Vec<usize>,
+    alphabet: HashSet<Symbol>, // todo yeet
+    pub transitions: HashSet<(usize, Symbol, usize)>,
+    pub q_start: usize,
+    pub q_accepting: HashSet<usize>,
 }
 
 impl Nfa {
     pub fn new(
-        states: Vec<u32>,
+        states: Vec<usize>,
         alphabet: HashSet<Symbol>,
-        transitions: HashSet<(u32, Symbol, u32)>,
-        q_start: u32,
-        q_accepting: HashSet<u32>,
+        transitions: HashSet<(usize, Symbol, usize)>,
+        q_start: usize,
+        q_accepting: HashSet<usize>,
     ) -> Nfa {
         let nfa = Nfa {
             states,
@@ -62,7 +46,10 @@ impl Nfa {
         match nfa.validate() {
             Ok(_) => {}
             Err(e) => {
-                panic!("Requested construction of invalid NFA: {}", format!("{}\n{:?}", e, nfa))
+                panic!(
+                    "Requested construction of invalid NFA: {}",
+                    format!("{}\n{:?}", e, nfa)
+                )
             }
         };
 
@@ -71,24 +58,44 @@ impl Nfa {
 
     // todo: non-determinism due to how iter() on hashsets works but okay for prototyping
     // in order to get greedy (but deterministic) behaviour, I should probably move all hashsets to vectors
-    fn find_transitions(&self, from: u32, c: Symbol) -> Vec<(u32, Symbol, u32)> {
-        self.transitions.iter().filter(|(f, w, _)| *f == from && *w == c).cloned().collect()
+    fn find_transitions(&self, from: usize, c: Symbol) -> Vec<(usize, Symbol, usize)> {
+        self.transitions
+            .iter()
+            .filter(|(f, w, _)| *f == from && *w == c)
+            .cloned()
+            .collect()
     }
 }
 
 impl Automaton for Nfa {
     fn from_symbol(s: &Symbol, alphabet: HashSet<Symbol>) -> Nfa {
         match s {
-            Symbol::CHAR(c) => Nfa::new(
-                vec![0, 1],
-                alphabet,
+            Symbol::CHAR(c) => {
+                let states = next_states(2);
                 // deliberately cloning c, because constructed NFA needs to be logically independent of original pattern
-                HashSet::from_iter(vec![(0, Symbol::CHAR(c.clone()), 1)]),
-                0,
-                HashSet::from([1]),
-            ),
-            Symbol::EPSILON => Nfa::new(vec![0], alphabet, HashSet::new(), 0, HashSet::from([0])),
-            Symbol::EMPTY => Nfa::new(vec![0], alphabet, HashSet::new(), 0, HashSet::new()),
+                let transition: (usize, Symbol, usize) = (
+                    states[0],
+                    Symbol::CHAR(c.clone()),
+                    states[1],
+                );
+                let q_start = states[0];
+                let q_accepting = HashSet::from([states[1]]);
+                Nfa::new(
+                    states,
+                    alphabet,
+                    HashSet::from_iter(vec![transition]),
+                    q_start,
+                    q_accepting,
+                )
+            }
+            Symbol::EPSILON =>  {
+                let q_0 = next_state();
+                Nfa::new(vec![q_0], alphabet, HashSet::new(), q_0, HashSet::from([q_0]))
+            },
+            Symbol::EMPTY => {
+                let q_0 = next_state();
+                Nfa::new(vec![q_0], alphabet, HashSet::new(), q_0, HashSet::new())
+            },
         }
     }
 
@@ -97,18 +104,18 @@ impl Automaton for Nfa {
             return Err(String::from("q_0 ∉ Q"));
         }
         if self.q_accepting.iter().any(|q| !self.states.contains(q)) {
-            return Err(String::from("F ⊄ Q"))
+            return Err(String::from("F ⊄ Q"));
         }
         for transition in self.transitions.iter() {
             if !self.states.contains(&transition.0) || !self.states.contains(&transition.2) {
-                return Err(format!("{:?} has invalid state(s)", transition))
+                return Err(format!("{:?} has invalid state(s)", transition));
             }
         }
 
         Ok(())
     }
 
-    fn _match(&self, state: u32, input: &str) -> bool {
+    fn _match(&self, state: usize, input: &str) -> bool {
         if input.is_empty() {
             return true;
         }
@@ -122,37 +129,50 @@ impl Automaton for Nfa {
         }
         return false;
     }
+
+    fn concat(&mut self, other: &Nfa) -> &Nfa {
+        self.states.extend(&other.states);
+        self
+    }
+
+    fn union(&mut self, other: &Nfa) -> &Nfa {
+        self
+    }
+
+    fn klenee(&mut self, other: &Nfa) -> &Nfa {
+        self
+    }
 }
 
 impl Debug for Nfa {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Nfa")
-         .field("Q", &self.states)
-         .field("d", &self.transitions)
-         .field("q_0", &self.q_start)
-         .field("F", &self.q_accepting)
-         .finish()
+            .field("Q", &self.states)
+            .field("d", &self.transitions)
+            .field("q_0", &self.q_start)
+            .field("F", &self.q_accepting)
+            .finish()
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Dfa {
-    states: Vec<u32>,
+    states: Vec<usize>,
     alphabet: HashSet<Symbol>,
     // using a hashmap should make the thing go speeeeed
-    transitions: HashSet<(u32, Symbol), u32>,
-    q_start: u32,
-    q_accepting: HashSet<u32>,
+    transitions: HashSet<(usize, Symbol), usize>,
+    q_start: usize,
+    q_accepting: HashSet<usize>,
 }
 
 impl Dfa {
     fn new(
-        states: Vec<u32>,
+        states: Vec<usize>,
         alphabet: HashSet<Symbol>,
-        transitions: HashSet<(u32, Symbol), u32>,
-        q_start: u32,
-        q_accepting: HashSet<u32>,
+        transitions: HashSet<(usize, Symbol), usize>,
+        q_start: usize,
+        q_accepting: HashSet<usize>,
     ) -> Dfa {
         Dfa {
             states,
@@ -160,6 +180,52 @@ impl Dfa {
             transitions,
             q_start,
             q_accepting,
+        }
+    }
+}
+
+///////////////////////////////////////////////////// HELPER TYPES ////////////////////////////////////////////////////
+
+// I don't plan on threading this (yet) so for now it's fine
+thread_local! {
+    static STATE_GEN: RefCell<usize> = RefCell::new(0);
+}
+
+fn next_state() -> usize {
+    STATE_GEN.with(|g| {
+        let mut id = g.borrow_mut();
+        let next_state = *id;
+        *id += 1;
+        next_state
+    })
+}
+
+fn next_states(n: usize) -> Vec<usize> {
+    let range = STATE_GEN.with(|g| {
+        let mut id = g.borrow_mut();
+        let first = *id;
+        *id += n;
+        // both bounds are inclusive
+        (first, *id - 1)
+    });
+    vec![range.0, range.1]
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Hash, PartialEq, Eq, Debug, Clone)]
+pub enum Symbol {
+    CHAR(char),
+    EPSILON,
+    EMPTY, // the empty language -> not sure if I actually need it. If not: todo rework this enum to an Optional
+}
+
+impl Display for Symbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Symbol::CHAR(c) => f.write_char(c.clone()),
+            Symbol::EPSILON => f.write_str(""),
+            Symbol::EMPTY => f.write_str(""),
         }
     }
 }
