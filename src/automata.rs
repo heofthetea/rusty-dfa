@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display, Formatter, Write};
 
 pub trait Automaton {
     /// Construct a fully valid `Automaton` accepting exactly the passed `Symbol`.
-    fn from_symbol(s: &Symbol, alphabet: HashSet<Symbol>) -> Self;
+    fn from_symbol(s: &Symbol) -> Self;
 
     /// Validate the `Automaton`
     /// returns: Ok(()) if valid, Err(reason) if not
@@ -22,7 +22,6 @@ pub trait Automaton {
 
 pub struct Nfa {
     pub states: Vec<usize>,
-    alphabet: HashSet<Symbol>, // todo yeet
     pub transitions: HashSet<(usize, Symbol, usize)>,
     pub q_start: usize,
     pub q_accepting: HashSet<usize>,
@@ -31,14 +30,12 @@ pub struct Nfa {
 impl Nfa {
     pub fn new(
         states: Vec<usize>,
-        alphabet: HashSet<Symbol>,
         transitions: HashSet<(usize, Symbol, usize)>,
         q_start: usize,
         q_accepting: HashSet<usize>,
     ) -> Nfa {
         let nfa = Nfa {
             states,
-            alphabet,
             transitions,
             q_start,
             q_accepting,
@@ -68,7 +65,7 @@ impl Nfa {
 }
 
 impl Automaton for Nfa {
-    fn from_symbol(s: &Symbol, alphabet: HashSet<Symbol>) -> Nfa {
+    fn from_symbol(s: &Symbol) -> Self {
         match s {
             Symbol::CHAR(c) => {
                 let states = next_states(2);
@@ -82,7 +79,6 @@ impl Automaton for Nfa {
                 let q_accepting = HashSet::from([states[1]]);
                 Nfa::new(
                     states,
-                    alphabet,
                     HashSet::from_iter(vec![transition]),
                     q_start,
                     q_accepting,
@@ -90,11 +86,11 @@ impl Automaton for Nfa {
             }
             Symbol::EPSILON =>  {
                 let q_0 = next_state();
-                Nfa::new(vec![q_0], alphabet, HashSet::new(), q_0, HashSet::from([q_0]))
+                Nfa::new(vec![q_0], HashSet::new(), q_0, HashSet::from([q_0]))
             },
             Symbol::EMPTY => {
                 let q_0 = next_state();
-                Nfa::new(vec![q_0], alphabet, HashSet::new(), q_0, HashSet::new())
+                Nfa::new(vec![q_0], HashSet::new(), q_0, HashSet::new())
             },
         }
     }
@@ -159,7 +155,6 @@ impl Debug for Nfa {
 
 pub struct Dfa {
     states: Vec<usize>,
-    alphabet: HashSet<Symbol>,
     // using a hashmap should make the thing go speeeeed
     transitions: HashSet<(usize, Symbol), usize>,
     q_start: usize,
@@ -169,14 +164,12 @@ pub struct Dfa {
 impl Dfa {
     fn new(
         states: Vec<usize>,
-        alphabet: HashSet<Symbol>,
         transitions: HashSet<(usize, Symbol), usize>,
         q_start: usize,
         q_accepting: HashSet<usize>,
     ) -> Dfa {
         Dfa {
             states,
-            alphabet,
             transitions,
             q_start,
             q_accepting,

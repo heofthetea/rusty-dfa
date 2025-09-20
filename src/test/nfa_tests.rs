@@ -19,7 +19,7 @@ mod tests {
         let q_start = 0;
         let q_accepting = HashSet::from([1]);
 
-        let nfa = Nfa::new(states, alphabet, transitions, q_start, q_accepting);
+        let nfa = Nfa::new(states, transitions, q_start, q_accepting);
 
         assert!(nfa.validate().is_ok());
     }
@@ -36,7 +36,7 @@ mod tests {
         let q_start = 5; // Invalid: not in states
         let q_accepting = HashSet::from([1]);
 
-        Nfa::new(states, alphabet, transitions, q_start, q_accepting);
+        Nfa::new(states, transitions, q_start, q_accepting);
     }
 
     /// GIVEN: States [0, 1, 2] and accepting states that include a state not in the states set
@@ -51,7 +51,7 @@ mod tests {
         let q_start = 0;
         let q_accepting = HashSet::from([1, 5]); // Invalid: 5 is not in states
 
-        Nfa::new(states, alphabet, transitions, q_start, q_accepting);
+        Nfa::new(states, transitions, q_start, q_accepting);
     }
 
     /// GIVEN: States [0, 1, 2] and a transition with a from-state not in the states set
@@ -69,7 +69,7 @@ mod tests {
         let q_start = 0;
         let q_accepting = HashSet::from([1]);
 
-        Nfa::new(states, alphabet, transitions, q_start, q_accepting);
+        Nfa::new(states, transitions, q_start, q_accepting);
     }
 
     /// GIVEN: States [0, 1, 2] and a transition with a to-state not in the states set
@@ -87,7 +87,7 @@ mod tests {
         let q_start = 0;
         let q_accepting = HashSet::from([1]);
 
-        Nfa::new(states, alphabet, transitions, q_start, q_accepting);
+        Nfa::new(states, transitions, q_start, q_accepting);
     }
 
     /// GIVEN: A character symbol 'x' and an alphabet containing 'x' and 'y'
@@ -98,7 +98,7 @@ mod tests {
         let symbol = Symbol::CHAR('x');
         let alphabet = HashSet::from([Symbol::CHAR('x'), Symbol::CHAR('y')]);
 
-        let nfa = Nfa::from_symbol(&symbol, alphabet.clone());
+        let nfa = Nfa::from_symbol(&symbol);
 
         assert!(nfa.validate().is_ok());
 
@@ -119,7 +119,7 @@ mod tests {
         let symbol = Symbol::EPSILON;
         let alphabet = HashSet::from([Symbol::CHAR('a')]);
 
-        let nfa = Nfa::from_symbol(&symbol, alphabet);
+        let nfa = Nfa::from_symbol(&symbol);
 
         assert!(nfa.validate().is_ok());
     }
@@ -132,7 +132,7 @@ mod tests {
         let symbol = Symbol::EMPTY;
         let alphabet = HashSet::from([Symbol::CHAR('a')]);
 
-        let nfa = Nfa::from_symbol(&symbol, alphabet);
+        let nfa = Nfa::from_symbol(&symbol);
 
         assert!(nfa.validate().is_ok());
     }
@@ -148,7 +148,7 @@ mod tests {
         let q_start = 0;
         let q_accepting = HashSet::from([0]); // Start state is also accepting
 
-        let nfa = Nfa::new(states, alphabet, transitions, q_start, q_accepting);
+        let nfa = Nfa::new(states, transitions, q_start, q_accepting);
         assert!(nfa.validate().is_ok());
     }
 }

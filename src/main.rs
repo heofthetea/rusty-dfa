@@ -14,10 +14,10 @@ fn main() {
     let pattern = Symbol::CHAR('a');
     let input = "a";
     // todo get rid of alphabet
-    let nfa = Nfa::from_symbol(&pattern, alphabet.clone());
+    let nfa = Nfa::from_symbol(&pattern);
     println!("{:?}", nfa);
     // println!("Matching '{}' against '{}': {}", input, pattern, nfa._match(0, input));
 
-    let nfa2 = Nfa::from_symbol(&Symbol::CHAR('b'), alphabet.clone());
+    let nfa2 = Nfa::from_symbol(&Symbol::CHAR('b'));
     println!("{:?}", nfa2);
 }
