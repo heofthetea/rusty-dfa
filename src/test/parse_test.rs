@@ -108,4 +108,12 @@ mod test_parse {
         assert!(!nfa._match(nfa.q_start,"ba"));
         assert!(!nfa._match(nfa.q_start,"a"));
     }
+
+    #[test]
+    fn test_pathological_backtracking_case() {
+        let pattern = "a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa";
+        let nfa = parse(&pattern);
+        println!("{:?}", nfa);
+        assert!(nfa._match(nfa.q_start, "aaaaaaaaaaaaaaaaaaaaaaaaa"))
+    }
 }

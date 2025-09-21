@@ -53,4 +53,5 @@ One of my goals for this project is to make it as fast as possible (at the very 
 This shall serve as a list of things I think I could do but don't want to now (because I'm already thinking too much and make slow progress (usual me problem)):
 
 - [ ] Make transition relation a `Vec<(Set<state, symbol>, Vec<state>)>` for O(len) iterations & better lookup
-- 
+- [ ] Re-introduce alphabet attribute to not have to decuct it at compile-time from the transitions
+- [ ] When I'm in the mood for a headache: Get rid of BTreeSets and use vectors (or hash maps)

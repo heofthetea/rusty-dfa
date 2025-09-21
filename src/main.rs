@@ -9,9 +9,8 @@ mod parse;
 mod test;
 
 fn main() {
-    let pattern = "(a|b)?o*b";
+    let pattern = "a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa";
     let nfa = parse(&pattern);
     println!("{:?}", nfa);
-    let input = "boooob";
-    println!("Matching {} against {} -> {}", input, pattern, nfa._match(nfa.q_start, input) )
+
 }

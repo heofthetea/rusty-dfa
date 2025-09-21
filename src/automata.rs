@@ -1,9 +1,8 @@
 use crate::automata::Symbol::CHAR;
-use bimap::BiMap;
+use bimap::{BiBTreeMap, BiMap};
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Write};
-use std::hash::Hash;
 
 pub trait Automaton {
     /// Validate the `Automaton`
@@ -86,9 +85,14 @@ impl Nfa {
     }
 
     // todo: replace this with sneaky workaround using Symbol::EVERYTHING in find_transitions
-    fn find_all_transitions(&self, from: usize) -> Vec<&(usize, Symbol, usize)> {
-        self.transitions.iter().filter(|t| t.0 == from).collect()
+    fn find_symbol_transitions(&self, from: &usize) -> Vec<&(usize, Symbol, usize)> {
+        self.transitions
+            .iter()
+            .filter(|t| &t.0 == from && t.1 != Symbol::EPSILON)
+            .collect()
     }
+
+    /////////////////////////////////////////////// POWERSET CONSTRUCTION //////////////////////////////////////////////
 
     pub fn ec(&self, state: usize) -> Vec<usize> {
         let mut ec: HashSet<usize> = HashSet::new();
@@ -107,6 +111,54 @@ impl Nfa {
             }
             self._ec(state, ec);
         }
+    }
+
+    /// Calculate all possible successor states for a single state
+    fn successors_single(&self) -> HashMap<(usize, Symbol), BTreeSet<usize>> {
+        let mut successors: HashMap<(usize, Symbol), BTreeSet<usize>> = HashMap::new();
+
+        for state in &self.states {
+            for transition in self.find_symbol_transitions(state) {
+                successors
+                    .entry((*state, transition.1))
+                    .or_default()
+                    .extend(self.ec(transition.2)); // behaves like a union here
+            }
+        }
+
+        successors
+    }
+
+    /// Calculate all possible successor states for a set of `states`
+    fn successors_multiple(
+        &self,
+        states: &BTreeSet<usize>,
+        successors_single: &HashMap<(usize, Symbol), BTreeSet<usize>>,
+    ) -> HashMap<Symbol, BTreeSet<usize>> {
+        let mut successors_by_symbol: HashMap<Symbol, BTreeSet<usize>> = HashMap::new();
+        for state in states {
+            let alphabet: HashSet<Symbol> = self
+                .find_symbol_transitions(state)
+                .iter()
+                .map(|t| t.1)
+                .collect();
+            for s in alphabet.into_iter() {
+                successors_by_symbol
+                    .entry(s)
+                    .or_default()
+                    .extend(successors_single.get(&(*state, s)).unwrap());
+            }
+        }
+        successors_by_symbol
+    }
+
+    fn intersect_q_accepting(&self, states: &BTreeSet<usize>) -> bool {
+        for partial in states {
+            if self.q_accepting.contains(partial) {
+                return true;
+            }
+        }
+        false
     }
 
     /////////////////////////////////////////////// CONSTRUCTION METHODS ///////////////////////////////////////////////
@@ -250,80 +302,51 @@ impl Dfa {
         }
     }
 
-    // fixme: 100% has some bugs somewhere, this is way too complicated to do first-try
-    // fixme: delegate some fucking functions
     pub fn from(nfa: &Nfa) -> Dfa {
-        assert!(nfa.validate().is_ok());
-        // left: Set<states>
-        // right: new state id
-        let mut new_states: BiMap<Vec<usize>, usize> = BiMap::new();
+        let successors = nfa.successors_single();
+        let new_q0: BTreeSet<usize> = nfa.ec(nfa.q_start).drain(..).collect();
+        let new_q0_id = next_state();
+
+        let mut states: BiMap<usize, BTreeSet<usize>> = BiMap::new();
+        states.insert(new_q0_id.clone(), new_q0.clone());
 
         let mut dfa = Dfa::new(
-            Vec::new(),
+            states.iter().map(|(q, _)| *q).collect(),
             HashMap::new(),
-            usize::MAX, // make it as likely as possible that if something goes wrong, q_0 is invalid
+            new_q0_id,
             HashSet::new(),
         );
-
-        for state in &nfa.states {
-            let id = next_state();
-            // todo: not happy with this style, it's not actually ensured that dfa has a valid q_0
-            if *state == nfa.q_start {
-                dfa.q_start = id;
-            }
-            new_states.insert(nfa.ec(*state), id);
-            dfa.states.push(id);
+        if nfa.intersect_q_accepting(&new_q0) {
+            dfa.q_accepting.insert(new_q0_id);
         }
 
         let mut i: usize = 0;
         while let Some(state) = dfa.states.get(i).cloned() {
-            let state_set = new_states.get_by_right(&state).unwrap();
-
-            // get all transitions that can be taken from any state in state_set, with any symbol
-            let mut transitions: Vec<(usize, Symbol, usize)> = Vec::new();
-            for partial_state in state_set {
-                transitions.extend(nfa.find_all_transitions(*partial_state))
-            }
-
-            // collect successors for state_set, mapped by the Symbol that needs to be consumed to reach those states
-            let mut successors: HashMap<Symbol, HashSet<usize>> = HashMap::new();
-            for transition in transitions {
-                // append the target of the transition to the successor states for this symbol
-                successors
-                    .entry(transition.1)
-                    .or_default()
-                    .extend(nfa.ec(transition.2));
-            }
-
-            for s in successors.keys() {
-                let succ: Vec<usize> = successors.get(s).unwrap().into_iter().cloned().collect();
-
-                // map successor set to a new state
-                // also ensure accepting states are mapped correctly
-                let to = if let Some(state) = new_states.get_by_left(&succ) {
-                    for partial in &succ {
-                        if nfa.q_accepting.contains(partial) {
-                            dfa.q_accepting.insert(*state);
-                        }
+            let old_states = states.get_by_left(&state).unwrap();
+            let transitions = nfa.successors_multiple(&old_states, &successors);
+            for (with, target) in transitions {
+                let to = if let Some(state) = states.get_by_right(&target) {
+                    //fixme extract
+                    if nfa.intersect_q_accepting(&target) {
+                        dfa.q_accepting.insert(*state);
                     }
                     *state
                 } else {
                     let new_state = next_state();
-                    for partial in &succ {
-                        if nfa.q_accepting.contains(partial) {
-                            dfa.q_accepting.insert(new_state);
-                        }
+                    if nfa.intersect_q_accepting(&target) {
+                        dfa.q_accepting.insert(new_state);
                     }
-                    new_states.insert(succ, new_state);
+
+                    states.insert(new_state, target);
                     dfa.states.push(new_state);
                     new_state
                 };
-                // todo: only for debuggin purposes
-                if dfa.transitions.contains_key(&(state, s.clone())) {
-                    panic!("{} already has a transition for symbol {}", state, s)
+                // only for debugging purposes
+                if dfa.transitions.contains_key(&(state, with.clone())) {
+                    panic!("{} already has a transition for symbol {}", state, with)
                 }
                 // insert the appropriate transition to this state
-                dfa.transitions.insert((state, s.clone()), to);
+                dfa.transitions.insert((state, with.clone()), to);
             }
             i += 1
         }
@@ -331,7 +354,7 @@ impl Dfa {
         dfa
     }
 
-    fn minimize(&self) {
+    pub fn minimize(&self) {
         todo!()
     }
 }
@@ -349,7 +372,10 @@ impl Automaton for Dfa {
                 return Err(format!("{:?} has invalid state(s)", transition));
             }
             if transition.0.1 == Symbol::EPSILON {
-                return Err(format!("{:?} is a forbidden epsilon-transition", transition))
+                return Err(format!(
+                    "{:?} is a forbidden epsilon-transition",
+                    transition
+                ));
             }
         }
 
