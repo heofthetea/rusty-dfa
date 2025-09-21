@@ -1,7 +1,8 @@
+use crate::automata::Symbol::CHAR;
+use std::arch::x86_64::_mm_undefined_si128;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display, Formatter, Write};
-use crate::automata::Symbol::CHAR;
 
 pub trait Automaton {
     /// Construct a fully valid `Automaton` accepting exactly the passed `Symbol`.
@@ -15,11 +16,6 @@ pub trait Automaton {
     /// returns: true if `input` is accepted, false otherwise.
     /// todo I may rework this in the future to also return where we matched or sth but for now is fine
     fn _match(&self, state: usize, input: &str) -> bool;
-
-    // note: these methods are supposed to be used in a sort of Accumulator pattern
-    fn klenee(&mut self) -> &Self;
-    fn concat(&mut self, other: Self) -> &Self;
-    fn union(&mut self, other: Self) -> &Self;
 }
 
 pub struct Nfa {
@@ -64,19 +60,77 @@ impl Nfa {
             .cloned()
             .collect()
     }
+
+    pub fn epsilon_closure(&self, state: usize, ec: &mut HashSet<usize>) {
+        ec.insert(state);
+
+        for transition in &self.find_transitions(state, Symbol::EPSILON) {
+            let state = transition.2;
+            if ec.contains(&state) {
+                continue
+            }
+            self.epsilon_closure(state, ec);
+        }
+    }
+
+    /////////////////////////////////////////////// CONSTRUCTION METHODS ///////////////////////////////////////////////
+    // note: these methods are supposed to be used in a sort of Accumulator pattern, with self being the accumulator
+
+    /// '*' and '+' quantifiers
+    pub fn klenee(&mut self, allow_empty: bool) {
+        let klenee_state = next_state();
+        self.states.push(klenee_state);
+        self.transitions
+            .insert((klenee_state, Symbol::EPSILON, self.q_start));
+        self.q_start = klenee_state;
+        for f in self.q_accepting.iter() {
+            self.transitions.insert((*f, Symbol::EPSILON, self.q_start));
+        }
+        // * accepts empty word, + does not
+        // if we do, we can remove all other accepting states
+        if allow_empty {
+            self.q_accepting = HashSet::from([self.q_start]);
+        }
+    }
+
+    /// '?' quantifier
+    pub fn optional(&mut self) {
+        self.union(Nfa::from_symbol(&Symbol::EPSILON))
+    }
+
+    pub fn concat(&mut self, other: Nfa) {
+        self.states.extend(&other.states);
+        self.transitions.extend(other.transitions);
+        for f in self.q_accepting.iter() {
+            self.transitions
+                .insert((*f, Symbol::EPSILON, other.q_start));
+        }
+        self.q_accepting = other.q_accepting;
+    }
+
+    pub fn union(&mut self, other: Nfa) {
+        self.states.extend(&other.states);
+        self.transitions.extend(other.transitions);
+
+        let union_state = next_state();
+        self.states.push(union_state);
+        self.transitions
+            .insert((union_state, Symbol::EPSILON, self.q_start));
+        self.transitions
+            .insert((union_state, Symbol::EPSILON, other.q_start));
+        self.q_start = union_state;
+
+        self.q_accepting.extend(other.q_accepting);
+    }
 }
 
 impl Automaton for Nfa {
     fn from_symbol(s: &Symbol) -> Self {
         match s {
-            Symbol::CHAR(c) => {
+            CHAR(c) => {
                 let states = next_states(2);
                 // deliberately cloning c, because constructed NFA needs to be logically independent of original pattern
-                let transition: (usize, Symbol, usize) = (
-                    states[0],
-                    Symbol::CHAR(*c),
-                    states[1],
-                );
+                let transition: (usize, Symbol, usize) = (states[0], Symbol::CHAR(*c), states[1]);
                 let q_start = states[0];
                 let q_accepting = HashSet::from([states[1]]);
                 Nfa::new(
@@ -117,7 +171,9 @@ impl Automaton for Nfa {
     /// Uses simple backtracking to get hold of NFAs non-determinism
     fn _match(&self, state: usize, word: &str) -> bool {
         if word.is_empty() {
-            return self.q_accepting.contains(&state);
+            let mut ec = HashSet::new();
+            self.epsilon_closure(state, &mut ec);
+            return ec.iter().find(|q| self.q_accepting.contains(q)).is_some();
         }
         let sc = Symbol::CHAR(word.chars().nth(0).unwrap());
         for transition in self.find_transitions(state, sc) {
@@ -129,58 +185,28 @@ impl Automaton for Nfa {
                 return true;
             }
         }
-        return false;
-    }
-
-    fn klenee(&mut self) -> &Nfa {
-        let klenee_state = next_state();
-        self.states.push(klenee_state);
-        self.transitions.insert((klenee_state, Symbol::EPSILON, self.q_start));
-        self.q_start = klenee_state;
-        for f in self.q_accepting.iter() {
-            self.transitions.insert((*f, Symbol::EPSILON, self.q_start));
-        }
-        self.q_accepting.insert(self.q_start);
-
-        self
-    }
-
-    fn concat(&mut self, other: Nfa) -> &Nfa {
-        self.states.extend(&other.states);
-        self.transitions.extend(other.transitions);
-        for f in self.q_accepting.iter() {
-            self.transitions.insert((*f, Symbol::EPSILON, other.q_start));
-        }
-        self.q_accepting = other.q_accepting;
-
-        self
-    }
-
-    fn union(&mut self, other: Nfa) -> &Nfa {
-        self.states.extend(&other.states);
-        self.transitions.extend(other.transitions);
-
-        let union_state = next_state();
-        self.states.push(union_state);
-        self.transitions.insert((union_state, Symbol::EPSILON, self.q_start));
-        self.transitions.insert((union_state, Symbol::EPSILON, other.q_start));
-        self.q_start = union_state;
-
-        self.q_accepting.extend(other.q_accepting);
-
-        self
+        false
     }
 }
 
 impl Debug for Nfa {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Nfa")
-         .field("Q", &self.states)
-         .field("D", &self.transitions)
-         .field("q_0", &self.q_start)
-         .field("F", &self.q_accepting)
-         .finish()
+        writeln!(f, "Nfa {{")?;
+        writeln!(f, "\tQ: {:?},", self.states)?;
+
+        let mut transitions: Vec<_> = self.transitions.iter().collect();
+        transitions.sort_by_key(|t| &t.0);
+        writeln!(f, "\tD: {{")?;
+        for t in transitions {
+            writeln!(f, "\t\t{:?},", t)?;
+        }
+        writeln!(f, "\t}}")?;
+        writeln!(f, "\tq_0: {:?},", self.q_start)?;
+        writeln!(f, "\tF: {:?},", self.q_accepting)?;
+        write!(f, "}}")
     }
+
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

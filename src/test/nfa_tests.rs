@@ -141,6 +141,7 @@ mod test_nfa_construction {
     }
 }
 
+
 #[cfg(test)]
 mod test_nfa_combinations {
     use crate::automata::{Automaton, Nfa, Symbol, reset_state_counter};
@@ -191,7 +192,7 @@ mod test_nfa_combinations {
     fn test_nfa_kleene() {
         reset_state_counter();
         let mut nfa = Nfa::from_symbol(&Symbol::CHAR('a'));
-        nfa.klenee();
+        nfa.klenee(true);
         assert!(nfa.validate().is_ok());
         println!("klenee: {:?}", nfa);
         assert!(nfa._match(nfa.q_start, ""));
@@ -202,4 +203,31 @@ mod test_nfa_combinations {
         assert!(!nfa._match(nfa.q_start, "ab"));
         assert!(!nfa._match(nfa.q_start, "ba"));
     }
+}
+
+#[cfg(test)]
+mod test_nfa_to_dfa {
+    use std::collections::HashSet;
+    use crate::automata::{Nfa, Symbol};
+
+    /// GIVEN: An NFA with cyclical epsilon transitions
+    /// WHEN: ec(0) is calculated
+    /// THEN: ec(0) = {0, 1} and no infinite recursion occurs
+    #[test]
+    fn test_cyclic_ec() {
+        let nfa = Nfa::new(
+            vec![0, 1],
+            HashSet::from([
+                (0, Symbol::EPSILON, 1),
+                (1, Symbol::EPSILON, 0)
+            ]),
+            0,
+            HashSet::from([1])
+        );
+        let mut ec = HashSet::new();
+        nfa.epsilon_closure(0, &mut ec);
+        assert!(ec.contains(&0));
+        assert!(ec.contains(&1));
+    }
+
 }

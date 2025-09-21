@@ -9,11 +9,11 @@ Regular Expression Engine using DFA construction, written in Rust.
 Automata are represented as by their theoretical tuplet definition.
 
 ## Algorithm
-1. Expression is parsed into a NFA
+1. Expression is parsed into a NFA using a predictive recursive descent
 2. NFA is transformed into a DFA using a [powerset construction](https://en.wikipedia.org/wiki/Powerset_construction)
 3. A run of the DFA on the input word is simulated
 
-> Note: I will also include a naive and non-optimized backtracking approach. Given the correct NFA structure, this is a trivial task. 
+> Note: I will also include a naive and non-optimized backtracking simulation of an NFA, as this is an easy byproduct of building NFAs correctly.
 
 ## Future Scope
 I may try my hands at a [Thompson NFA](https://swtch.com/~rsc/regexp/regexp1.html) at some point, to see how my approach stacks up.

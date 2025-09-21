@@ -1,8 +1,9 @@
 use crate::automata::{Automaton, Nfa, Symbol};
 
-/// Parse `pattern` into a Non-deterministic finite automaton.
+/// Parse `pattern` into a Non-deterministic Finite Automaton.
 ///
-/// Uses an algorithm that _may_ be derived from a recursive descent, however there's no Backtracking involved.
+/// Uses an algorithm is an optimized version of a recursive descent, constructed over a grammar where
+/// choices can be made deterministically without a need for backtracking.
 /// The pattern is parsed by order of precedence according to the following grammar:
 /// ```
 /// EXPR -> <EXPR>|<DISJUNCT> / <DISJUNCT>
@@ -23,7 +24,6 @@ pub fn parse(pattern: &str) -> Nfa {
     _expr(pattern)
 }
 
-
 fn _expr(pattern: &str) -> Nfa {
     let tokens: Vec<String> = _tokenize_expr(pattern);
     let mut nfa = _disjunct(&tokens[0]);
@@ -42,19 +42,26 @@ fn _disjunct(disjunct: &str) -> Nfa {
     nfa
 }
 
-/// This function is my demise I just can't get this clean AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 fn _factor(factor: &str) -> Nfa {
-    let limit: usize = if factor.ends_with('*') {
-        factor.len() - 1
-    } else {
-        factor.len()
+    // aaaaaaaaaaaaaaaaaa every solution to this is so ugly wtf
+    let (atom, suffix) = match factor.chars().rev().next() {
+        Some('*') | Some('+') | Some('?') if factor.len() > 1 => {
+            (&factor[..factor.len() - 1], Some(factor.chars().last().unwrap()))
+        }
+        _ => (factor, None),
     };
-    if factor.ends_with("**") {
-        panic!("Encountered two '*' back to back");
+
+    // we deliberately don't support non-greediness becaus that concept is irrelevant for a DFA based engine
+    if suffix.is_some() && (atom.ends_with(|c| ['*', '+', '?'].contains(&c))) {
+        panic!("Illegal stacking of quantifiers")
     }
-    let mut nfa = _atom(&factor[..limit]);
-    if limit != factor.len() {
-        nfa.klenee();
+
+    let mut nfa = _atom(atom);
+    if let Some(c) = suffix {
+        match c {
+            '?' => {nfa.optional()}
+            _ => nfa.klenee(c == '*')
+        }
     }
     nfa
 }
@@ -99,17 +106,17 @@ fn _tokenize_expr(pattern: &str) -> Vec<String> {
 
 /// O(n)
 fn _tokenize_disjunct(pattern: &str) -> Vec<String> {
-    // not allowed - klenee star always nees to reference a valid regular expression
-    if pattern.starts_with("*") {
-        panic!("Unexpected '*'")
+    // not allowed - quantifiers always need to reference a valid regular expression
+    if pattern.starts_with(|c| ['*', '+', '?'].contains(&c)) {
+        panic!("Nothing to quantify")
     }
     // safe to initialize empty,as first run wil ALWAYS perform a push
     let mut tokens: Vec<String> = Vec::new();
     let mut brackets: usize = 0;
 
     for c in pattern.chars() {
-        // no new factor if we're either inside brackets or have a klenee star
-        if brackets != 0 || c == '*' {
+        // no new factor if we're either inside brackets or have a quantifier
+        if brackets != 0 || ['*', '+', '?'].contains(&c) {
             let last = tokens.last_mut().unwrap();
             last.push(c);
         } else {
