@@ -5,6 +5,31 @@ Regular Expression Engine using DFA construction, written in Rust.
 
 [//]: # (<br>The DFA is constructed via [powerset construction]&#40;https://en.wikipedia.org/wiki/Powerset_construction&#41; from an appropriate NFA.)
 
+## Supported Syntax
+This will never be a fully perl-comatible expression engine, for the very simple reason that it uses a DFA and thus cannot possibly
+support backreferences. However, I'll probably also not include all of the syntactic sugar of deterministic perl-compatible expressions,
+as a simple form of regular expressions are equally strong from a theoretical standpoint.
+
+### Required Features to accept regular languages
+- [x] Klenee Star quantifier (`a*`)
+- [x] Union (`a|b`)
+- [x] Explicit precedence (`(r)`)
+- [ ] Escaping (`\r` where `r` is a reserved symbol)
+
+### Syntactic sugar
+- [x] One-or-more quantifier (`a+`)
+- [x] Zero-or-one quantifier (`a?`)
+- [ ] Everything matcher (`.`)
+- [ ] Character classes (`[ab]`)
+  - [ ] Ranges (`[a-f]`)
+- [ ] n-times (`r{n}`)
+- [ ] Escape sequences for non-reserved symbols (`\d`)
+
+### Practical Syntax not rooted in Language Theory
+- [ ] Non-greedy quantifiers
+- [ ] Capture groups
+
+
 ## Representation
 Automata are represented as by their theoretical tuplet definition.
 
