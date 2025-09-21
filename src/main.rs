@@ -1,7 +1,6 @@
-use std::collections::HashSet;
+
 use crate::automata::Automaton;
-use crate::automata::Nfa;
-use crate::automata::Symbol;
+use crate::parse::parse;
 
 mod automata;
 mod parse;
@@ -10,13 +9,9 @@ mod parse;
 mod test;
 
 fn main() {
-    // let alphabet = HashSet::from([Symbol::CHAR('a'), Symbol::CHAR('b'), Symbol::EMPTY, Symbol::EPSILON]);
-    let pattern = Symbol::CHAR('a');
-    let input = "a";
-    let nfa = Nfa::from_symbol(&pattern);
+    let pattern = "(a|b)?o*b";
+    let nfa = parse(&pattern);
     println!("{:?}", nfa);
-    println!("Matching '{}' against '{}': {}", input, pattern, nfa._match(0, input));
-
-    let nfa2 = Nfa::from_symbol(&Symbol::CHAR('b'));
-    println!("{:?}", nfa2);
+    let input = "boooob";
+    println!("Matching {} against {} -> {}", input, pattern, nfa._match(nfa.q_start, input) )
 }

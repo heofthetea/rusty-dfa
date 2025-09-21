@@ -6,14 +6,16 @@ use crate::automata::{Automaton, Nfa, Symbol};
 /// choices can be made deterministically without a need for backtracking.
 /// The pattern is parsed by order of precedence according to the following grammar:
 /// ```
-/// EXPR -> <EXPR>|<DISJUNCT> / <DISJUNCT>
-/// DISJUNCT -> <DISJUNCT><FACTOR> / <FACTOR>
-/// FACTOR -> <ATOM>* / <ATOM>
+/// EXPR -> EXPR|DISJUNCT / DISJUNCT
+/// DISJUNCT -> DISJUNCT FACTOR / FACTOR
+/// FACTOR -> ATOM* / ATOM
 /// ATOM -> (EXPR) / symbol
 /// ```
 /// Where `EXPR` is the start symbol.
 ///
 /// For every NTS, a corresponding function exists tokenizing its passed string according to its production rules.
+/// In order to ensure explicit precedence through parantheses, a stack is used to keep track of opening and closing
+/// brackets encountered so far.
 /// For example, the string `(a|b)|c` will be parsed by `_expr` into the strings `(a|b)` and `c`. These are then passed
 /// to the `_disjunct` function, and the returned NFAs are unionized.
 ///

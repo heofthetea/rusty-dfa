@@ -224,10 +224,21 @@ mod test_nfa_to_dfa {
             0,
             HashSet::from([1])
         );
-        let mut ec = HashSet::new();
-        nfa.epsilon_closure(0, &mut ec);
+        let ec = nfa.ec(0);
         assert!(ec.contains(&0));
         assert!(ec.contains(&1));
+    }
+
+    #[test]
+    fn test_type_extend() {
+        let mut set = HashSet::from([1, 2]);
+        set.extend(vec![2, 3, 1, 4]);
+        assert!(set.contains(&1));
+        assert!(set.contains(&2));
+        assert!(set.contains(&3));
+        assert!(set.contains(&4));
+        assert_eq!(set.len(), 4)
+
     }
 
 }

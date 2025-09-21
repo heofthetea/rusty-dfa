@@ -15,6 +15,7 @@ as a simple form of regular expressions are equally strong from a theoretical st
 - [x] Union (`a|b`)
 - [x] Explicit precedence (`(r)`)
 - [ ] Escaping (`\r` where `r` is a reserved symbol)
+- [ ] `^` and `$` quantifiers and making the automata behave correctly to accpet _parts_ of a word instead of the entire word
 
 ### Syntactic sugar
 - [x] One-or-more quantifier (`a+`)
@@ -32,6 +33,10 @@ as a simple form of regular expressions are equally strong from a theoretical st
 
 ## Representation
 Automata are represented as by their theoretical tuplet definition.
+<br>Caveat: An automaton has no explicit alphabet associated with it. As I only care about accepting words, if I encounter a symbol that's not present in any 
+transition it simply means the Automaton does not accept the word (i.e. not match in this case). 
+This goes for both NFAs and DFAs (latter of which usually must have a transition for every symbol of the alphabet for every state).
+When finding patterns in a string, an unknown symbol simply means the run is reset back to `q_start`.
 
 ## Algorithm
 1. Expression is parsed into a NFA using a predictive recursive descent

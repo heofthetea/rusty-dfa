@@ -1,13 +1,11 @@
 use crate::automata::Symbol::CHAR;
-use std::arch::x86_64::_mm_undefined_si128;
+use bimap::BiMap;
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display, Formatter, Write};
+use std::hash::Hash;
 
 pub trait Automaton {
-    /// Construct a fully valid `Automaton` accepting exactly the passed `Symbol`.
-    fn from_symbol(s: &Symbol) -> Self;
-
     /// Validate the `Automaton`
     /// returns: Ok(()) if valid, Err(reason) if not
     fn validate(&self) -> Result<(), String>;
@@ -51,25 +49,63 @@ impl Nfa {
         nfa
     }
 
+    /// Construct a fully valid `Automaton` accepting exactly the passed `Symbol`.
+    pub fn from_symbol(s: &Symbol) -> Self {
+        match s {
+            CHAR(c) => {
+                let states = next_states(2);
+                // deliberately cloning c, because constructed NFA needs to be logically independent of original pattern
+                let transition: (usize, Symbol, usize) = (states[0], Symbol::CHAR(*c), states[1]);
+                let q_start = states[0];
+                let q_accepting = HashSet::from([states[1]]);
+                Nfa::new(
+                    states,
+                    HashSet::from_iter(vec![transition]),
+                    q_start,
+                    q_accepting,
+                )
+            }
+            Symbol::EPSILON => {
+                let q_0 = next_state();
+                Nfa::new(vec![q_0], HashSet::new(), q_0, HashSet::from([q_0]))
+            }
+            Symbol::EMPTY => {
+                let q_0 = next_state();
+                Nfa::new(vec![q_0], HashSet::new(), q_0, HashSet::new())
+            }
+        }
+    }
+
     // fixme: non-determinism due to how iter() on hashsets works but okay for prototyping
     // in order to get greedy (but deterministic) behaviour, I should probably move all hashsets to vectors
-    fn find_transitions(&self, from: usize, c: Symbol) -> Vec<(usize, Symbol, usize)> {
+    fn find_transitions(&self, from: usize, c: Symbol) -> Vec<&(usize, Symbol, usize)> {
         self.transitions
             .iter()
             .filter(|(f, w, _)| *f == from && (*w == c || *w == Symbol::EPSILON))
-            .cloned()
             .collect()
     }
 
-    pub fn epsilon_closure(&self, state: usize, ec: &mut HashSet<usize>) {
+    // todo: replace this with sneaky workaround using Symbol::EVERYTHING in find_transitions
+    fn find_all_transitions(&self, from: usize) -> Vec<&(usize, Symbol, usize)> {
+        self.transitions.iter().filter(|t| t.0 == from).collect()
+    }
+
+    pub fn ec(&self, state: usize) -> Vec<usize> {
+        let mut ec: HashSet<usize> = HashSet::new();
+        self._ec(state, &mut ec);
+        ec.into_iter().collect()
+    }
+
+    /// Stateful recursive stack-safe function to collect the epsilon closure of `state` into `ec`
+    fn _ec(&self, state: usize, ec: &mut HashSet<usize>) {
         ec.insert(state);
 
         for transition in &self.find_transitions(state, Symbol::EPSILON) {
             let state = transition.2;
             if ec.contains(&state) {
-                continue
+                continue;
             }
-            self.epsilon_closure(state, ec);
+            self._ec(state, ec);
         }
     }
 
@@ -125,32 +161,6 @@ impl Nfa {
 }
 
 impl Automaton for Nfa {
-    fn from_symbol(s: &Symbol) -> Self {
-        match s {
-            CHAR(c) => {
-                let states = next_states(2);
-                // deliberately cloning c, because constructed NFA needs to be logically independent of original pattern
-                let transition: (usize, Symbol, usize) = (states[0], Symbol::CHAR(*c), states[1]);
-                let q_start = states[0];
-                let q_accepting = HashSet::from([states[1]]);
-                Nfa::new(
-                    states,
-                    HashSet::from_iter(vec![transition]),
-                    q_start,
-                    q_accepting,
-                )
-            }
-            Symbol::EPSILON => {
-                let q_0 = next_state();
-                Nfa::new(vec![q_0], HashSet::new(), q_0, HashSet::from([q_0]))
-            }
-            Symbol::EMPTY => {
-                let q_0 = next_state();
-                Nfa::new(vec![q_0], HashSet::new(), q_0, HashSet::new())
-            }
-        }
-    }
-
     fn validate(&self) -> Result<(), String> {
         if !self.states.contains(&self.q_start) {
             return Err(String::from("q_0 ∉ Q"));
@@ -164,6 +174,15 @@ impl Automaton for Nfa {
             }
         }
 
+        let mut num_state: HashSet<usize> = HashSet::new();
+        for state in &self.states {
+            if num_state.contains(&state) {
+                return Err(format!("State {} exists twice", state));
+            }
+            num_state.insert(*state);
+        }
+        drop(num_state);
+
         Ok(())
     }
 
@@ -171,11 +190,10 @@ impl Automaton for Nfa {
     /// Uses simple backtracking to get hold of NFAs non-determinism
     fn _match(&self, state: usize, word: &str) -> bool {
         if word.is_empty() {
-            let mut ec = HashSet::new();
-            self.epsilon_closure(state, &mut ec);
+            let ec = self.ec(state);
             return ec.iter().find(|q| self.q_accepting.contains(q)).is_some();
         }
-        let sc = Symbol::CHAR(word.chars().nth(0).unwrap());
+        let sc = CHAR(word.chars().nth(0).unwrap());
         for transition in self.find_transitions(state, sc) {
             let from = match transition.1 {
                 CHAR(_) => 1,
@@ -205,8 +223,6 @@ impl Debug for Nfa {
         writeln!(f, "\tF: {:?},", self.q_accepting)?;
         write!(f, "}}")
     }
-
-
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,15 +230,15 @@ impl Debug for Nfa {
 pub struct Dfa {
     states: Vec<usize>,
     // using a hashmap should make the thing go speeeeed
-    transitions: HashSet<(usize, Symbol), usize>,
+    transitions: HashMap<(usize, Symbol), usize>,
     q_start: usize,
     q_accepting: HashSet<usize>,
 }
 
 impl Dfa {
-    fn new(
+    pub fn new(
         states: Vec<usize>,
-        transitions: HashSet<(usize, Symbol), usize>,
+        transitions: HashMap<(usize, Symbol), usize>,
         q_start: usize,
         q_accepting: HashSet<usize>,
     ) -> Dfa {
@@ -233,8 +249,142 @@ impl Dfa {
             q_accepting,
         }
     }
+
+    // fixme: 100% has some bugs somewhere, this is way too complicated to do first-try
+    // fixme: delegate some fucking functions
+    pub fn from(nfa: &Nfa) -> Dfa {
+        assert!(nfa.validate().is_ok());
+        // left: Set<states>
+        // right: new state id
+        let mut new_states: BiMap<Vec<usize>, usize> = BiMap::new();
+
+        let mut dfa = Dfa::new(
+            Vec::new(),
+            HashMap::new(),
+            usize::MAX, // make it as likely as possible that if something goes wrong, q_0 is invalid
+            HashSet::new(),
+        );
+
+        for state in &nfa.states {
+            let id = next_state();
+            // todo: not happy with this style, it's not actually ensured that dfa has a valid q_0
+            if *state == nfa.q_start {
+                dfa.q_start = id;
+            }
+            new_states.insert(nfa.ec(*state), id);
+            dfa.states.push(id);
+        }
+
+        let mut i: usize = 0;
+        while let Some(state) = dfa.states.get(i).cloned() {
+            let state_set = new_states.get_by_right(&state).unwrap();
+
+            // get all transitions that can be taken from any state in state_set, with any symbol
+            let mut transitions: Vec<(usize, Symbol, usize)> = Vec::new();
+            for partial_state in state_set {
+                transitions.extend(nfa.find_all_transitions(*partial_state))
+            }
+
+            // collect successors for state_set, mapped by the Symbol that needs to be consumed to reach those states
+            let mut successors: HashMap<Symbol, HashSet<usize>> = HashMap::new();
+            for transition in transitions {
+                // append the target of the transition to the successor states for this symbol
+                successors
+                    .entry(transition.1)
+                    .or_default()
+                    .extend(nfa.ec(transition.2));
+            }
+
+            for s in successors.keys() {
+                let succ: Vec<usize> = successors.get(s).unwrap().into_iter().cloned().collect();
+
+                // map successor set to a new state
+                // also ensure accepting states are mapped correctly
+                let to = if let Some(state) = new_states.get_by_left(&succ) {
+                    for partial in &succ {
+                        if nfa.q_accepting.contains(partial) {
+                            dfa.q_accepting.insert(*state);
+                        }
+                    }
+                    *state
+                } else {
+                    let new_state = next_state();
+                    for partial in &succ {
+                        if nfa.q_accepting.contains(partial) {
+                            dfa.q_accepting.insert(new_state);
+                        }
+                    }
+                    new_states.insert(succ, new_state);
+                    dfa.states.push(new_state);
+                    new_state
+                };
+                // todo: only for debuggin purposes
+                if dfa.transitions.contains_key(&(state, s.clone())) {
+                    panic!("{} already has a transition for symbol {}", state, s)
+                }
+                // insert the appropriate transition to this state
+                dfa.transitions.insert((state, s.clone()), to);
+            }
+            i += 1
+        }
+
+        dfa
+    }
+
     fn minimize(&self) {
         todo!()
+    }
+}
+
+impl Automaton for Dfa {
+    fn validate(&self) -> Result<(), String> {
+        if !self.states.contains(&self.q_start) {
+            return Err(String::from("q_0 ∉ Q"));
+        }
+        if self.q_accepting.iter().any(|q| !self.states.contains(q)) {
+            return Err(String::from("F ⊄ Q"));
+        }
+        for transition in self.transitions.iter() {
+            if !self.states.contains(&transition.0.0) || !self.states.contains(&transition.1) {
+                return Err(format!("{:?} has invalid state(s)", transition));
+            }
+            if transition.0.1 == Symbol::EPSILON {
+                return Err(format!("{:?} is a forbidden epsilon-transition", transition))
+            }
+        }
+
+        let mut num_state: HashSet<usize> = HashSet::new();
+        for state in &self.states {
+            if num_state.contains(&state) {
+                return Err(format!("State {} exists twice", state));
+            }
+            num_state.insert(*state);
+        }
+        drop(num_state);
+
+        Ok(())
+    }
+
+    fn _match(&self, state: usize, input: &str) -> bool {
+        todo!()
+    }
+}
+
+impl Debug for Dfa {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Dfa {{")?;
+        writeln!(f, "\tQ: {:?},", self.states)?;
+
+        let mut transitions: Vec<_> = self.transitions.iter().collect();
+        transitions.sort_by_key(|t| &t.0.0);
+        writeln!(f, "\td: {{")?;
+        for t in transitions {
+            writeln!(f, "\t\t{:?},", t)?;
+        }
+        writeln!(f, "\t}}")?;
+        writeln!(f, "\tq_0: {:?},", self.q_start)?;
+        writeln!(f, "\tF: {:?},", self.q_accepting)?;
+        write!(f, "}}")
     }
 }
 
@@ -275,10 +425,11 @@ pub fn reset_state_counter() {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Hash, PartialEq, Eq, Debug, Clone)]
+#[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Symbol {
     CHAR(char),
     EPSILON,
+    // EVERYTHING, // used later on for the everything matcher .
     EMPTY, // the empty language -> not sure if I actually need it. If not: todo rework this enum to an Optional
 }
 
