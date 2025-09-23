@@ -22,6 +22,53 @@ pub struct Nfa {
     pub q_accepting: HashSet<usize>,
 }
 
+impl Automaton for Nfa {
+    fn validate(&self) -> Result<(), String> {
+        if !self.states.contains(&self.q_start) {
+            return Err(String::from("q_0 ∉ Q"));
+        }
+        if self.q_accepting.iter().any(|q| !self.states.contains(q)) {
+            return Err(String::from("F ⊄ Q"));
+        }
+        for transition in self.transitions.iter() {
+            if !self.states.contains(&transition.0) || !self.states.contains(&transition.2) {
+                return Err(format!("{:?} has invalid state(s)", transition));
+            }
+        }
+
+        let mut num_state: HashSet<usize> = HashSet::new();
+        for state in &self.states {
+            if num_state.contains(&state) {
+                return Err(format!("State {} exists twice", state));
+            }
+            num_state.insert(*state);
+        }
+        drop(num_state);
+
+        Ok(())
+    }
+
+    /// Simulate a run of `self` on the word `input`.
+    /// Uses simple backtracking to get hold of NFAs non-determinism
+    fn _match(&self, state: usize, word: &str) -> bool {
+        if word.is_empty() {
+            let ec = self.ec(state);
+            return ec.iter().find(|q| self.q_accepting.contains(q)).is_some();
+        }
+        let sc = CHAR(word.chars().nth(0).unwrap());
+        for transition in self.find_transitions(state, sc) {
+            let from = match transition.1 {
+                CHAR(_) => 1,
+                Symbol::EPSILON | Symbol::EMPTY => 0,
+            };
+            if self._match(transition.2, &word[from..]) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
 impl Nfa {
     pub fn new(
         states: Vec<usize>,
@@ -90,6 +137,56 @@ impl Nfa {
             .iter()
             .filter(|t| &t.0 == from && t.1 != Symbol::EPSILON)
             .collect()
+    }
+
+    /////////////////////////////////////////////// CONSTRUCTION METHODS ///////////////////////////////////////////////
+    // note: these methods are supposed to be used in a sort of Accumulator pattern, with self being the accumulator
+
+    /// '*' and '+' quantifiers
+    pub fn klenee(&mut self, allow_empty: bool) {
+        let klenee_state = next_state();
+        self.states.push(klenee_state);
+        self.transitions
+            .insert((klenee_state, Symbol::EPSILON, self.q_start));
+        self.q_start = klenee_state;
+        for f in self.q_accepting.iter() {
+            self.transitions.insert((*f, Symbol::EPSILON, self.q_start));
+        }
+        // * accepts empty word, + does not
+        // if we do, we can remove all other accepting states
+        if allow_empty {
+            self.q_accepting = HashSet::from([self.q_start]);
+        }
+    }
+
+    /// '?' quantifier
+    pub fn optional(&mut self) {
+        self.union(Nfa::from_symbol(&Symbol::EPSILON))
+    }
+
+    pub fn concat(&mut self, other: Nfa) {
+        self.states.extend(&other.states);
+        self.transitions.extend(other.transitions);
+        for f in self.q_accepting.iter() {
+            self.transitions
+                .insert((*f, Symbol::EPSILON, other.q_start));
+        }
+        self.q_accepting = other.q_accepting;
+    }
+
+    pub fn union(&mut self, other: Nfa) {
+        self.states.extend(&other.states);
+        self.transitions.extend(other.transitions);
+
+        let union_state = next_state();
+        self.states.push(union_state);
+        self.transitions
+            .insert((union_state, Symbol::EPSILON, self.q_start));
+        self.transitions
+            .insert((union_state, Symbol::EPSILON, other.q_start));
+        self.q_start = union_state;
+
+        self.q_accepting.extend(other.q_accepting);
     }
 
     /////////////////////////////////////////////// POWERSET CONSTRUCTION //////////////////////////////////////////////
@@ -161,102 +258,6 @@ impl Nfa {
         false
     }
 
-    /////////////////////////////////////////////// CONSTRUCTION METHODS ///////////////////////////////////////////////
-    // note: these methods are supposed to be used in a sort of Accumulator pattern, with self being the accumulator
-
-    /// '*' and '+' quantifiers
-    pub fn klenee(&mut self, allow_empty: bool) {
-        let klenee_state = next_state();
-        self.states.push(klenee_state);
-        self.transitions
-            .insert((klenee_state, Symbol::EPSILON, self.q_start));
-        self.q_start = klenee_state;
-        for f in self.q_accepting.iter() {
-            self.transitions.insert((*f, Symbol::EPSILON, self.q_start));
-        }
-        // * accepts empty word, + does not
-        // if we do, we can remove all other accepting states
-        if allow_empty {
-            self.q_accepting = HashSet::from([self.q_start]);
-        }
-    }
-
-    /// '?' quantifier
-    pub fn optional(&mut self) {
-        self.union(Nfa::from_symbol(&Symbol::EPSILON))
-    }
-
-    pub fn concat(&mut self, other: Nfa) {
-        self.states.extend(&other.states);
-        self.transitions.extend(other.transitions);
-        for f in self.q_accepting.iter() {
-            self.transitions
-                .insert((*f, Symbol::EPSILON, other.q_start));
-        }
-        self.q_accepting = other.q_accepting;
-    }
-
-    pub fn union(&mut self, other: Nfa) {
-        self.states.extend(&other.states);
-        self.transitions.extend(other.transitions);
-
-        let union_state = next_state();
-        self.states.push(union_state);
-        self.transitions
-            .insert((union_state, Symbol::EPSILON, self.q_start));
-        self.transitions
-            .insert((union_state, Symbol::EPSILON, other.q_start));
-        self.q_start = union_state;
-
-        self.q_accepting.extend(other.q_accepting);
-    }
-}
-
-impl Automaton for Nfa {
-    fn validate(&self) -> Result<(), String> {
-        if !self.states.contains(&self.q_start) {
-            return Err(String::from("q_0 ∉ Q"));
-        }
-        if self.q_accepting.iter().any(|q| !self.states.contains(q)) {
-            return Err(String::from("F ⊄ Q"));
-        }
-        for transition in self.transitions.iter() {
-            if !self.states.contains(&transition.0) || !self.states.contains(&transition.2) {
-                return Err(format!("{:?} has invalid state(s)", transition));
-            }
-        }
-
-        let mut num_state: HashSet<usize> = HashSet::new();
-        for state in &self.states {
-            if num_state.contains(&state) {
-                return Err(format!("State {} exists twice", state));
-            }
-            num_state.insert(*state);
-        }
-        drop(num_state);
-
-        Ok(())
-    }
-
-    /// Simulate a run of `self` on the word `input`.
-    /// Uses simple backtracking to get hold of NFAs non-determinism
-    fn _match(&self, state: usize, word: &str) -> bool {
-        if word.is_empty() {
-            let ec = self.ec(state);
-            return ec.iter().find(|q| self.q_accepting.contains(q)).is_some();
-        }
-        let sc = CHAR(word.chars().nth(0).unwrap());
-        for transition in self.find_transitions(state, sc) {
-            let from = match transition.1 {
-                CHAR(_) => 1,
-                Symbol::EPSILON | Symbol::EMPTY => 0,
-            };
-            if self._match(transition.2, &word[from..]) {
-                return true;
-            }
-        }
-        false
-    }
 }
 
 impl Debug for Nfa {
@@ -280,7 +281,7 @@ impl Debug for Nfa {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Dfa {
-    states: Vec<usize>,
+    pub states: Vec<usize>,
     // using a hashmap should make the thing go speeeeed
     transitions: HashMap<(usize, Symbol), usize>,
     q_start: usize,
@@ -326,7 +327,6 @@ impl Dfa {
             let transitions = nfa.successors_multiple(&old_states, &successors);
             for (with, target) in transitions {
                 let to = if let Some(state) = states.get_by_right(&target) {
-                    //fixme extract
                     if nfa.intersect_q_accepting(&target) {
                         dfa.q_accepting.insert(*state);
                     }
@@ -348,6 +348,68 @@ impl Dfa {
                 // insert the appropriate transition to this state
                 dfa.transitions.insert((state, with.clone()), to);
             }
+            i += 1
+        }
+
+        dfa
+    }
+    pub fn from_old(nfa: &Nfa) -> Dfa {
+        assert!(nfa.validate().is_ok());
+        // left: Set<states>
+        // right: new state id
+        let new_q0: BTreeSet<usize> = nfa.ec(nfa.q_start).drain(..).collect();
+        let new_q0_state = next_state();
+        let mut new_states: BiMap<BTreeSet<usize>, usize> = BiMap::from_iter([(new_q0, new_q0_state)]);
+        let mut dfa = Dfa::new(
+            Vec::from([new_q0_state]),
+            HashMap::new(),
+            new_q0_state,
+            HashSet::new(),
+        );
+
+        let mut i: usize = 0;
+        while let Some(state) = dfa.states.get(i).cloned() {
+            let state_set = new_states.get_by_right(&state).unwrap();
+            // get all transitions that can be taken from any state in state_set, with any symbol
+            let mut transitions: Vec<(usize, Symbol, usize)> = Vec::new();
+            for partial_state in state_set {
+                transitions.extend(nfa.find_symbol_transitions(partial_state))
+            }
+            // collect successors for state_set, mapped by the Symbol that needs to be consumed to reach those states
+            let mut successors: HashMap<Symbol, BTreeSet<usize>> = HashMap::new();
+            for transition in transitions {
+                // append the target of the transition to the successor states for this symbol
+                successors
+                    .entry(transition.1)
+                    .or_default()
+                    .extend(nfa.ec(transition.2));
+            }
+            for s in successors.keys() {
+                let succ: BTreeSet<usize> = successors.get(s).unwrap().into_iter().cloned().collect();
+                // map successor set to a new state
+                // also ensure accepting states are mapped correctly
+                let to = if let Some(state) = new_states.get_by_left(&succ) {
+                    if nfa.intersect_q_accepting(&succ) {
+                        dfa.q_accepting.insert(*state);
+                    }
+                    *state
+                } else {
+                    let new_state = next_state();
+                    if nfa.intersect_q_accepting(&succ) {
+                        dfa.q_accepting.insert(new_state);
+                    }
+                    new_states.insert(succ, new_state);
+                    dfa.states.push(new_state);
+                    new_state
+                };
+                // todo: only for debuggin purposes
+                if dfa.transitions.contains_key(&(state, s.clone())) {
+                    panic!("{} already has a transition for symbol {}", state, s)
+                }
+                // insert the appropriate transition to this state
+                dfa.transitions.insert((state, s.clone()), to);
+            }
+
             i += 1
         }
 
