@@ -60,6 +60,7 @@ fn benchmark_powerset_construction(q: usize) {
     println!("Benchmarking powerset construction with {} states", q);
 
     let nfa = generate_pathological_nfa(q);
+    println!("{:?}", &nfa);
     println!("Generated pathological NFA with {} states and {} transitions",
              nfa.states.len(), nfa.transitions.len());
 

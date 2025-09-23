@@ -57,8 +57,8 @@ def plot_benchmarks(data):
     ax1.grid(True, alpha=0.3)
 
     # Logarithmic scale plot
-    ax2.loglog(nfa_states, from_times, 'b-o', label='from()', markersize=4)
-    ax2.loglog(nfa_states, from_old_times, 'r-s', label='from_old()', markersize=4)
+    ax2.semilogy(nfa_states, from_times, 'b-o', label='from()', markersize=4)
+    ax2.semilogy(nfa_states, from_old_times, 'r-s', label='from_old()', markersize=4)
     ax2.set_xlabel('NFA States')
     ax2.set_ylabel('Time (seconds)')
     ax2.set_title('Powerset Construction Performance (Log Scale)')

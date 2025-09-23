@@ -10,5 +10,5 @@ mod test;
 
 fn main() {
     println!();
-    benchmark::run_benchmark_suite(20);
+    benchmark::run_benchmark_suite(3);
 }
