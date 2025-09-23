@@ -1,5 +1,5 @@
 
-use crate::automata::Automaton;
+use crate::automata::{Automaton, Dfa};
 use crate::parse::parse;
 
 mod automata;
@@ -10,7 +10,10 @@ mod test;
 
 fn main() {
     let pattern = "a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa";
+    let pattern = "a?a?aa";
     let nfa = parse(&pattern);
-    println!("{:?}", nfa);
+    println!("{:?}", &nfa);
+    let dfa = Dfa::from(&nfa);
+    println!("{:?}", &dfa)
 
 }

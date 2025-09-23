@@ -83,13 +83,55 @@ impl Nfa {
             .filter(|(f, w, _)| *f == from && (*w == c || *w == Symbol::EPSILON))
             .collect()
     }
+    
+    /////////////////////////////////////////////// CONSTRUCTION METHODS ///////////////////////////////////////////////
+    // note: these methods are supposed to be used in a sort of Accumulator pattern, with self being the accumulator
 
-    // todo: replace this with sneaky workaround using Symbol::EVERYTHING in find_transitions
-    fn find_symbol_transitions(&self, from: &usize) -> Vec<&(usize, Symbol, usize)> {
+    /// '*' and '+' quantifiers
+    pub fn klenee(&mut self, allow_empty: bool) {
+        let klenee_state = next_state();
+        self.states.push(klenee_state);
         self.transitions
-            .iter()
-            .filter(|t| &t.0 == from && t.1 != Symbol::EPSILON)
-            .collect()
+            .insert((klenee_state, Symbol::EPSILON, self.q_start));
+        self.q_start = klenee_state;
+        for f in self.q_accepting.iter() {
+            self.transitions.insert((*f, Symbol::EPSILON, self.q_start));
+        }
+        // * accepts empty word, + does not
+        // if we do, we can remove all other accepting states
+        if allow_empty {
+            self.q_accepting = HashSet::from([self.q_start]);
+        }
+    }
+
+    /// '?' quantifier
+    pub fn optional(&mut self) {
+        self.union(Nfa::from_symbol(&Symbol::EPSILON))
+    }
+
+    pub fn concat(&mut self, other: Nfa) {
+        self.states.extend(&other.states);
+        self.transitions.extend(other.transitions);
+        for f in self.q_accepting.iter() {
+            self.transitions
+                .insert((*f, Symbol::EPSILON, other.q_start));
+        }
+        self.q_accepting = other.q_accepting;
+    }
+
+    pub fn union(&mut self, other: Nfa) {
+        self.states.extend(&other.states);
+        self.transitions.extend(other.transitions);
+
+        let union_state = next_state();
+        self.states.push(union_state);
+        self.transitions
+            .insert((union_state, Symbol::EPSILON, self.q_start));
+        self.transitions
+            .insert((union_state, Symbol::EPSILON, other.q_start));
+        self.q_start = union_state;
+
+        self.q_accepting.extend(other.q_accepting);
     }
 
     /////////////////////////////////////////////// POWERSET CONSTRUCTION //////////////////////////////////////////////
@@ -111,6 +153,14 @@ impl Nfa {
             }
             self._ec(state, ec);
         }
+    }
+
+    // todo: replace this with sneaky workaround using Symbol::EVERYTHING in find_transitions
+    fn find_symbol_transitions(&self, from: &usize) -> Vec<&(usize, Symbol, usize)> {
+        self.transitions
+            .iter()
+            .filter(|t| &t.0 == from && t.1 != Symbol::EPSILON)
+            .collect()
     }
 
     /// Calculate all possible successor states for a single state
@@ -161,55 +211,6 @@ impl Nfa {
         false
     }
 
-    /////////////////////////////////////////////// CONSTRUCTION METHODS ///////////////////////////////////////////////
-    // note: these methods are supposed to be used in a sort of Accumulator pattern, with self being the accumulator
-
-    /// '*' and '+' quantifiers
-    pub fn klenee(&mut self, allow_empty: bool) {
-        let klenee_state = next_state();
-        self.states.push(klenee_state);
-        self.transitions
-            .insert((klenee_state, Symbol::EPSILON, self.q_start));
-        self.q_start = klenee_state;
-        for f in self.q_accepting.iter() {
-            self.transitions.insert((*f, Symbol::EPSILON, self.q_start));
-        }
-        // * accepts empty word, + does not
-        // if we do, we can remove all other accepting states
-        if allow_empty {
-            self.q_accepting = HashSet::from([self.q_start]);
-        }
-    }
-
-    /// '?' quantifier
-    pub fn optional(&mut self) {
-        self.union(Nfa::from_symbol(&Symbol::EPSILON))
-    }
-
-    pub fn concat(&mut self, other: Nfa) {
-        self.states.extend(&other.states);
-        self.transitions.extend(other.transitions);
-        for f in self.q_accepting.iter() {
-            self.transitions
-                .insert((*f, Symbol::EPSILON, other.q_start));
-        }
-        self.q_accepting = other.q_accepting;
-    }
-
-    pub fn union(&mut self, other: Nfa) {
-        self.states.extend(&other.states);
-        self.transitions.extend(other.transitions);
-
-        let union_state = next_state();
-        self.states.push(union_state);
-        self.transitions
-            .insert((union_state, Symbol::EPSILON, self.q_start));
-        self.transitions
-            .insert((union_state, Symbol::EPSILON, other.q_start));
-        self.q_start = union_state;
-
-        self.q_accepting.extend(other.q_accepting);
-    }
 }
 
 impl Automaton for Nfa {
@@ -326,7 +327,6 @@ impl Dfa {
             let transitions = nfa.successors_multiple(&old_states, &successors);
             for (with, target) in transitions {
                 let to = if let Some(state) = states.get_by_right(&target) {
-                    //fixme extract
                     if nfa.intersect_q_accepting(&target) {
                         dfa.q_accepting.insert(*state);
                     }
@@ -336,7 +336,6 @@ impl Dfa {
                     if nfa.intersect_q_accepting(&target) {
                         dfa.q_accepting.insert(new_state);
                     }
-
                     states.insert(new_state, target);
                     dfa.states.push(new_state);
                     new_state
