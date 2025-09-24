@@ -158,11 +158,11 @@ mod test_nfa_combinations {
         left.concat(right);
         assert!(left.validate().is_ok());
         println!("concat: {:?}", left);
-        assert!(left._match(left.q_start, "ab"));
-        assert!(!left._match(left.q_start, "a"));
-        assert!(!left._match(left.q_start, "b"));
-        assert!(!left._match(left.q_start, ""));
-        assert!(!left._match(left.q_start, "abc"));
+        assert!(left._accept(left.q_start, "ab"));
+        assert!(!left._accept(left.q_start, "a"));
+        assert!(!left._accept(left.q_start, "b"));
+        assert!(!left._accept(left.q_start, ""));
+        assert!(!left._accept(left.q_start, "abc"));
     }
 
     /// GIVEN: An NFA left accepting the language {"a"}
@@ -177,12 +177,12 @@ mod test_nfa_combinations {
         left.union(right);
         assert!(left.validate().is_ok());
         println!("union: {:?}", left);
-        assert!(left._match(left.q_start, "a"));
-        assert!(left._match(left.q_start, "b"));
-        assert!(!left._match(left.q_start, "ab"));
-        assert!(!left._match(left.q_start, ""));
-        assert!(!left._match(left.q_start, "c"));
-        assert!(!left._match(left.q_start, "abc"));
+        assert!(left._accept(left.q_start, "a"));
+        assert!(left._accept(left.q_start, "b"));
+        assert!(!left._accept(left.q_start, "ab"));
+        assert!(!left._accept(left.q_start, ""));
+        assert!(!left._accept(left.q_start, "c"));
+        assert!(!left._accept(left.q_start, "abc"));
     }
 
     /// GIVEN: An NFA accepting the language {"a"}
@@ -195,13 +195,13 @@ mod test_nfa_combinations {
         nfa.klenee(true);
         assert!(nfa.validate().is_ok());
         println!("klenee: {:?}", nfa);
-        assert!(nfa._match(nfa.q_start, ""));
-        assert!(nfa._match(nfa.q_start, "a"));
-        assert!(nfa._match(nfa.q_start, "aa"));
-        assert!(nfa._match(nfa.q_start, "aaa"));
-        assert!(!nfa._match(nfa.q_start, "b"));
-        assert!(!nfa._match(nfa.q_start, "ab"));
-        assert!(!nfa._match(nfa.q_start, "ba"));
+        assert!(nfa._accept(nfa.q_start, ""));
+        assert!(nfa._accept(nfa.q_start, "a"));
+        assert!(nfa._accept(nfa.q_start, "aa"));
+        assert!(nfa._accept(nfa.q_start, "aaa"));
+        assert!(!nfa._accept(nfa.q_start, "b"));
+        assert!(!nfa._accept(nfa.q_start, "ab"));
+        assert!(!nfa._accept(nfa.q_start, "ba"));
     }
 }
 

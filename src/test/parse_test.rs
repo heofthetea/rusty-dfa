@@ -8,17 +8,17 @@ mod test_parse {
         let pattern = "a*|(ab(a|b)*)b|b";
         let nfa = parse(&pattern);
         println!("{:?}", nfa);
-        assert!(nfa._match(nfa.q_start,"a"));
-        assert!(nfa._match(nfa.q_start,"aaaa"));
-        assert!(nfa._match(nfa.q_start,"abb"));
-        assert!(nfa._match(nfa.q_start,"abab"));
-        assert!(nfa._match(nfa.q_start,"abbb"));
-        assert!(nfa._match(nfa.q_start,"b"));
-        assert!(!nfa._match(nfa.q_start,"c"));
+        assert!(nfa._accept(nfa.q_start, "a"));
+        assert!(nfa._accept(nfa.q_start, "aaaa"));
+        assert!(nfa._accept(nfa.q_start, "abb"));
+        assert!(nfa._accept(nfa.q_start, "abab"));
+        assert!(nfa._accept(nfa.q_start, "abbb"));
+        assert!(nfa._accept(nfa.q_start, "b"));
+        assert!(!nfa._accept(nfa.q_start, "c"));
         // not matching
-        assert!(!nfa._match(nfa.q_start,"ac"));
-        assert!(!nfa._match(nfa.q_start,"ba"));
-        assert!(!nfa._match(nfa.q_start, "abaaabbbbbaaaabbbbbabbaabba"))
+        assert!(!nfa._accept(nfa.q_start, "ac"));
+        assert!(!nfa._accept(nfa.q_start, "ba"));
+        assert!(!nfa._accept(nfa.q_start, "abaaabbbbbaaaabbbbbabbaabba"))
     }
 
     #[test]
@@ -27,9 +27,9 @@ mod test_parse {
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
 
-        assert!(nfa._match(nfa.q_start, "a"));
-        assert!(nfa._match(nfa.q_start, "aa"));
-        assert!(!nfa._match(nfa.q_start, ""));
+        assert!(nfa._accept(nfa.q_start, "a"));
+        assert!(nfa._accept(nfa.q_start, "aa"));
+        assert!(!nfa._accept(nfa.q_start, ""));
     }
 
     #[test]
@@ -38,9 +38,9 @@ mod test_parse {
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
 
-        assert!(nfa._match(nfa.q_start, ""));
-        assert!(nfa._match(nfa.q_start, "a"));
-        assert!(!nfa._match(nfa.q_start, "aa"));
+        assert!(nfa._accept(nfa.q_start, ""));
+        assert!(nfa._accept(nfa.q_start, "a"));
+        assert!(!nfa._accept(nfa.q_start, "aa"));
     }
 
     #[test]
@@ -49,11 +49,11 @@ mod test_parse {
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
 
-        assert!(nfa._match(nfa.q_start, "b"));
-        assert!(nfa._match(nfa.q_start, "ab"));
-        assert!(nfa._match(nfa.q_start, "abbb"));
-        assert!(!nfa._match(nfa.q_start,""));
-        assert!(!nfa._match(nfa.q_start, "aab"));
+        assert!(nfa._accept(nfa.q_start, "b"));
+        assert!(nfa._accept(nfa.q_start, "ab"));
+        assert!(nfa._accept(nfa.q_start, "abbb"));
+        assert!(!nfa._accept(nfa.q_start, ""));
+        assert!(!nfa._accept(nfa.q_start, "aab"));
     }
 
     #[test]
@@ -62,15 +62,15 @@ mod test_parse {
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
 
-        assert!(nfa._match(nfa.q_start, "b"));
-        assert!(nfa._match(nfa.q_start, "b"));
-        assert!(nfa._match(nfa.q_start, "bbb"));
-        assert!(nfa._match(nfa.q_start, "bc"));
-        assert!(nfa._match(nfa.q_start, "bc"));
-        assert!(nfa._match(nfa.q_start, "bbc"));
+        assert!(nfa._accept(nfa.q_start, "b"));
+        assert!(nfa._accept(nfa.q_start, "b"));
+        assert!(nfa._accept(nfa.q_start, "bbb"));
+        assert!(nfa._accept(nfa.q_start, "bc"));
+        assert!(nfa._accept(nfa.q_start, "bc"));
+        assert!(nfa._accept(nfa.q_start, "bbc"));
 
-        assert!(!nfa._match(nfa.q_start,""));
-        assert!(!nfa._match(nfa.q_start, "bcc"));
+        assert!(!nfa._accept(nfa.q_start, ""));
+        assert!(!nfa._accept(nfa.q_start, "bcc"));
     }
 
     #[test]
@@ -78,17 +78,16 @@ mod test_parse {
         let pattern =  "a?b+(a|c)?|c+";
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
-        assert!(nfa._match(nfa.q_start,"b"));
-        assert!(nfa._match(nfa.q_start,"aba"));
-        assert!(nfa._match(nfa.q_start,"ba"));
-        assert!(nfa._match(nfa.q_start,"c"));
-        assert!(nfa._match(nfa.q_start,"ccccc"));
-        assert!(nfa._match(nfa.q_start,"bc"));
+        assert!(nfa._accept(nfa.q_start, "b"));
+        assert!(nfa._accept(nfa.q_start, "aba"));
+        assert!(nfa._accept(nfa.q_start, "ba"));
+        assert!(nfa._accept(nfa.q_start, "c"));
+        assert!(nfa._accept(nfa.q_start, "ccccc"));
+        assert!(nfa._accept(nfa.q_start, "bc"));
         // not matching
-        assert!(!nfa._match(nfa.q_start,""));
-        assert!(!nfa._match(nfa.q_start,"aab"));
-        assert!(!nfa._match(nfa.q_start,"ac"));
-
+        assert!(!nfa._accept(nfa.q_start, ""));
+        assert!(!nfa._accept(nfa.q_start, "aab"));
+        assert!(!nfa._accept(nfa.q_start, "ac"));
     }
 
     #[test]
@@ -97,16 +96,16 @@ mod test_parse {
         let pattern = "(a|b)?a*b";
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
-        assert!(nfa._match(nfa.q_start,"b"));
-        assert!(nfa._match(nfa.q_start,"ab"));
-        assert!(nfa._match(nfa.q_start,"aaaab"));
-        assert!(nfa._match(nfa.q_start,"baab"));
-        assert!(nfa._match(nfa.q_start,"bb"));
+        assert!(nfa._accept(nfa.q_start, "b"));
+        assert!(nfa._accept(nfa.q_start, "ab"));
+        assert!(nfa._accept(nfa.q_start, "aaaab"));
+        assert!(nfa._accept(nfa.q_start, "baab"));
+        assert!(nfa._accept(nfa.q_start, "bb"));
         // not matching
-        assert!(!nfa._match(nfa.q_start,""));
-        assert!(!nfa._match(nfa.q_start,"bbab"));
-        assert!(!nfa._match(nfa.q_start,"ba"));
-        assert!(!nfa._match(nfa.q_start,"a"));
+        assert!(!nfa._accept(nfa.q_start, ""));
+        assert!(!nfa._accept(nfa.q_start, "bbab"));
+        assert!(!nfa._accept(nfa.q_start, "ba"));
+        assert!(!nfa._accept(nfa.q_start, "a"));
     }
 
     #[test]
@@ -114,6 +113,6 @@ mod test_parse {
         let pattern = "a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa";
         let nfa = parse(&pattern);
         println!("{:?}", nfa);
-        assert!(nfa._match(nfa.q_start, "aaaaaaaaaaaaaaaaaaaaaaaaa"))
+        assert!(nfa._accept(nfa.q_start, "aaaaaaaaaaaaaaaaaaaaaaaaa"))
     }
 }

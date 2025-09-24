@@ -11,8 +11,11 @@ pub trait Automaton {
 
     /// Simulate a run of `self` on the word `input`.
     /// returns: true if `input` is accepted, false otherwise.
-    /// todo I may rework this in the future to also return where we matched or sth but for now is fine
-    fn _match(&self, state: usize, input: &str) -> bool;
+    /// Note: This algorithm accepts entire words, as by traditional theoretical definition
+    fn _accept(&self, state: usize, input: &str) -> bool;
+
+    /// Find whether `input` contains a match anywhere.
+    fn find(&self, input: &str) -> usize;
 }
 
 pub struct Nfa {
@@ -83,7 +86,7 @@ impl Nfa {
             .filter(|(f, w, _)| *f == from && (*w == c || *w == Symbol::EPSILON))
             .collect()
     }
-    
+
     /////////////////////////////////////////////// CONSTRUCTION METHODS ///////////////////////////////////////////////
     // note: these methods are supposed to be used in a sort of Accumulator pattern, with self being the accumulator
 
@@ -202,7 +205,7 @@ impl Nfa {
         successors_by_symbol
     }
 
-    fn intersect_q_accepting(&self, states: &BTreeSet<usize>) -> bool {
+    fn contains_accepting_state(&self, states: &BTreeSet<usize>) -> bool {
         for partial in states {
             if self.q_accepting.contains(partial) {
                 return true;
@@ -234,14 +237,13 @@ impl Automaton for Nfa {
             }
             num_state.insert(*state);
         }
-        drop(num_state);
 
         Ok(())
     }
 
     /// Simulate a run of `self` on the word `input`.
     /// Uses simple backtracking to get hold of NFAs non-determinism
-    fn _match(&self, state: usize, word: &str) -> bool {
+    fn _accept(&self, state: usize, word: &str) -> bool {
         if word.is_empty() {
             let ec = self.ec(state);
             return ec.iter().find(|q| self.q_accepting.contains(q)).is_some();
@@ -252,11 +254,15 @@ impl Automaton for Nfa {
                 CHAR(_) => 1,
                 Symbol::EPSILON | Symbol::EMPTY => 0,
             };
-            if self._match(transition.2, &word[from..]) {
+            if self._accept(transition.2, &word[from..]) {
                 return true;
             }
         }
         false
+    }
+
+    fn find(&self, input: &str) -> usize {
+        unimplemented!()
     }
 }
 
@@ -284,7 +290,7 @@ pub struct Dfa {
     states: Vec<usize>,
     // using a hashmap should make the thing go speeeeed
     transitions: HashMap<(usize, Symbol), usize>,
-    q_start: usize,
+    pub q_start: usize,
     q_accepting: HashSet<usize>,
 }
 
@@ -303,6 +309,7 @@ impl Dfa {
         }
     }
 
+    /// Powerset Construction of a DFA from the passed `Nfa`.
     pub fn from(nfa: &Nfa) -> Dfa {
         let successors = nfa.successors_single();
         let new_q0: BTreeSet<usize> = nfa.ec(nfa.q_start).drain(..).collect();
@@ -312,14 +319,15 @@ impl Dfa {
         states.insert(new_q0_id.clone(), new_q0.clone());
 
         let mut dfa = Dfa::new(
-            states.iter().map(|(q, _)| *q).collect(),
+            Vec::from([new_q0_id]),
             HashMap::new(),
             new_q0_id,
             HashSet::new(),
         );
-        if nfa.intersect_q_accepting(&new_q0) {
+        if nfa.contains_accepting_state(&new_q0) {
             dfa.q_accepting.insert(new_q0_id);
         }
+        drop(new_q0);
 
         let mut i: usize = 0;
         while let Some(state) = dfa.states.get(i).cloned() {
@@ -327,13 +335,11 @@ impl Dfa {
             let transitions = nfa.successors_multiple(&old_states, &successors);
             for (with, target) in transitions {
                 let to = if let Some(state) = states.get_by_right(&target) {
-                    if nfa.intersect_q_accepting(&target) {
-                        dfa.q_accepting.insert(*state);
-                    }
+                    // set has been previously generated
                     *state
                 } else {
                     let new_state = next_state();
-                    if nfa.intersect_q_accepting(&target) {
+                    if nfa.contains_accepting_state(&target) {
                         dfa.q_accepting.insert(new_state);
                     }
                     states.insert(new_state, target);
@@ -385,13 +391,26 @@ impl Automaton for Dfa {
             }
             num_state.insert(*state);
         }
-        drop(num_state);
 
         Ok(())
     }
 
-    fn _match(&self, state: usize, input: &str) -> bool {
-        todo!()
+    fn _accept(&self, state: usize, input: &str) -> bool {
+        let mut current = state;
+        'outer: loop {
+            for c in input.chars() {
+                if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
+                    current = *next;
+                    continue;
+                }
+                break 'outer false;
+            }
+            break self.q_accepting.contains(&current);
+        }
+    }
+
+    fn find(&self, input: &str) -> usize {
+        unimplemented!()
     }
 }
 
