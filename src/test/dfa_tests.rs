@@ -3,7 +3,7 @@ mod test_powerset_construction {
     use std::collections::{HashMap, HashSet};
     use crate::automata::{Automaton, Dfa, Nfa, Symbol};
     use crate::parse::parse;
-
+    
     #[test]
     fn from_simple_nfa() {
         let nfa = Nfa::from_symbol(&Symbol::CHAR('a'));
@@ -117,6 +117,24 @@ pub mod test_dfa_matching {
         let dfa = Dfa::from(&nfa);
         println!("{:?}", dfa);
         assert!(dfa._accept(dfa.q_start, "aaaaaaaaaaaaaaaaaaaaaaaaa"))
+    }
+
+    //////////////////////////////////////////////////////// FINDING ///////////////////////////////////////////////////////
+    #[test]
+    fn find_easy() {
+        let pattern = "a*";
+        let dfa = Dfa::from(&parse(&pattern));
+        
+        assert_eq!(dfa.find("aaa").unwrap(), (0, 0));
+    }
+    
+    #[test]
+    fn i_think_this_will_break() {
+        let pattern = "aab|ac";
+        let dfa = Dfa::from(&parse(&pattern));
+        print!("{:?}", dfa);
+        
+        assert!(dfa.find("aac").is_some());
     }
 
 }

@@ -20,7 +20,7 @@ as a simple form of regular expressions are equally strong from a theoretical st
 ### Syntactic sugar
 - [x] One-or-more quantifier (`a+`)
 - [x] Zero-or-one quantifier (`a?`)
-- [ ] Everything matcher (`.`)
+- [ ] Everything matcher (`.`) (introduces non-determinism i'm afraid)
 - [ ] Character classes (`[ab]`)
   - [ ] Ranges (`[a-f]`)
 - [ ] n-times (`r{n}`)

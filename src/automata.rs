@@ -14,8 +14,9 @@ pub trait Automaton {
     /// Note: This algorithm accepts entire words, as by traditional theoretical definition
     fn _accept(&self, state: usize, input: &str) -> bool;
 
-    /// Find whether `input` contains a match anywhere.
-    fn find(&self, input: &str) -> usize;
+    /// Find whether `input` contains a word of this automaton's language anywhere.
+    /// If so, returns the index of where the match starts.
+    fn find(&self, input: &str) -> Option<(usize, usize)>;
 }
 
 pub struct Nfa {
@@ -213,7 +214,6 @@ impl Nfa {
         }
         false
     }
-
 }
 
 impl Automaton for Nfa {
@@ -261,7 +261,7 @@ impl Automaton for Nfa {
         false
     }
 
-    fn find(&self, input: &str) -> usize {
+    fn find(&self, input: &str) -> Option<(usize, usize)> {
         unimplemented!()
     }
 }
@@ -359,6 +359,7 @@ impl Dfa {
         dfa
     }
 
+    // may not actually be needed we'll see
     pub fn minimize(&self) {
         todo!()
     }
@@ -397,20 +398,41 @@ impl Automaton for Dfa {
 
     fn _accept(&self, state: usize, input: &str) -> bool {
         let mut current = state;
-        'outer: loop {
+        'main: loop {
             for c in input.chars() {
                 if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
                     current = *next;
                     continue;
                 }
-                break 'outer false;
+                break 'main false;
             }
             break self.q_accepting.contains(&current);
         }
     }
 
-    fn find(&self, input: &str) -> usize {
-        unimplemented!()
+    /// non-greedy currently
+    fn find(&self, input: &str) -> Option<(usize, usize)> {
+        let mut current = &self.q_start;
+        let mut start: Option<usize> = None;
+        let mut end: Option<usize> = None;
+        for (id, c) in input.chars().enumerate() {
+            if let Some(next) = self.transitions.get(&(*current, CHAR(c))) {
+                if current == &self.q_start {
+                    start = Some(id);
+                }
+                if self.q_accepting.contains(&current) {
+                    end = Some(id);
+                    break;
+                }
+                current = next;
+                continue;
+            }
+            current = &self.q_start;
+        }
+        if end.is_none() {
+            return None;
+        }
+        Option::Some((start.unwrap(), end.unwrap()))
     }
 }
 
