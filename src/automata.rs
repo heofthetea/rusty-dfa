@@ -100,16 +100,21 @@ impl Nfa {
         if word.is_empty() || !full_accept {
             let ec = self.ec(state);
             if ec.iter().find(|q| self.q_accepting.contains(q)).is_some() {
-                return Some(depth);
+                return Some(depth - 1); // undo last addition
             }
         }
         if let Some(c) = word.chars().nth(0) {
             for transition in self.find_transitions(state, CHAR(c)) {
-                let from = match transition.1 {
+                let consumed = match transition.1 {
                     CHAR(_) => 1,
                     Symbol::EPSILON | Symbol::EMPTY => 0,
                 };
-                let end = self._accept(transition.2, &word[from..], depth + 1, full_accept);
+                let end = self._accept(
+                    transition.2,
+                    &word[consumed..],
+                    depth + consumed,
+                    full_accept,
+                );
                 if end.is_some() {
                     return end;
                 }
@@ -170,13 +175,15 @@ impl Nfa {
         self.q_accepting.extend(other.q_accepting);
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_finding(&mut self) {
         let source = next_state();
         self.states.push(source);
         for s in &self.alphabet {
             self.transitions.insert((source, s.clone(), source));
         }
-        self.transitions.insert((source, Symbol::EPSILON, self.q_start));
+        self.transitions
+            .insert((source, Symbol::EPSILON, self.q_start));
         self.q_start = source;
     }
 
@@ -323,20 +330,20 @@ impl Debug for Nfa {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Dfa {
-    states: Vec<usize>,
+    // state -> distance from q_0 (this information is required to deduct where a match started)
+    states: HashMap<usize, usize>,
     // using a hashmap should make the thing go speeeeed
     transitions: HashMap<(usize, Symbol), usize>,
     pub q_start: usize,
-    // state -> distance from q_0
-    q_accepting: HashMap<usize, usize>,
+    q_accepting: HashSet<usize>,
 }
 
 impl Dfa {
     pub fn new(
-        states: Vec<usize>,
+        states: HashMap<usize, usize>,
         transitions: HashMap<(usize, Symbol), usize>,
         q_start: usize,
-        q_accepting: HashMap<usize, usize>,
+        q_accepting: HashSet<usize>,
     ) -> Dfa {
         Dfa {
             states,
@@ -352,40 +359,39 @@ impl Dfa {
         let new_q0: BTreeSet<usize> = nfa.ec(nfa.q_start).drain(..).collect();
         let new_q0_id = next_state();
 
-        let mut states: BiMap<usize, BTreeSet<usize>> = BiMap::new();
-        let mut distance_to_q0: HashMap<usize, usize> = HashMap::new();
-        states.insert(new_q0_id.clone(), new_q0.clone());
-        distance_to_q0.insert(new_q0_id.clone(), 0);
+        let mut new_states = vec![new_q0_id];
+        let mut id_to_state_set: BiMap<usize, BTreeSet<usize>> = BiMap::new();
+        id_to_state_set.insert(new_q0_id.clone(), new_q0.clone());
 
         let mut dfa = Dfa::new(
-            Vec::from([new_q0_id]),
+            HashMap::from([(new_q0_id, 0)]),
             HashMap::new(),
             new_q0_id,
-            HashMap::new()
+            HashSet::new(),
         );
         if nfa.contains_accepting_state(&new_q0) {
-            dfa.q_accepting.insert(new_q0_id, 0);
+            dfa.q_accepting.insert(new_q0_id);
         }
         drop(new_q0);
 
         let mut i: usize = 0;
-        while let Some(state) = dfa.states.get(i).cloned() {
+        while let Some(state) = new_states.get(i).cloned() {
             // states in the nfa
-            let old_states = states.get_by_left(&state).unwrap();
+            let old_states = id_to_state_set.get_by_left(&state).unwrap();
             let transitions = nfa.successors_multiple(&old_states, &successors);
             for (with, target) in transitions {
-                let to = if let Some(state) = states.get_by_right(&target) {
-                    // set has been previously generated
+                let to = if let Some(state) = id_to_state_set.get_by_right(&target) {
+                    // state set has been previously generated
                     *state
                 } else {
                     let new_state = next_state();
-                    let dist = *distance_to_q0.get(&state).unwrap() + 1;
-                    distance_to_q0.insert(new_state, dist);
+                    let dist = *dfa.states.get(&state).unwrap() + 1;
                     if nfa.contains_accepting_state(&target) {
-                        dfa.q_accepting.insert(new_state, dist);
+                        dfa.q_accepting.insert(new_state);
                     }
-                    states.insert(new_state, target);
-                    dfa.states.push(new_state);
+                    id_to_state_set.insert(new_state, target);
+                    dfa.states.insert(new_state, dist);
+                    new_states.push(new_state);
                     new_state
                 };
                 // insert the appropriate transition to this state
@@ -405,14 +411,14 @@ impl Dfa {
 
 impl Automaton for Dfa {
     fn validate(&self) -> Result<(), String> {
-        if !self.states.contains(&self.q_start) {
+        if !self.states.contains_key(&self.q_start) {
             return Err(String::from("q_0 ∉ Q"));
         }
-        if self.q_accepting.keys().any(|q| !self.states.contains(q)) {
+        if self.q_accepting.iter().any(|q| !self.states.contains_key(q)) {
             return Err(String::from("F ⊄ Q"));
         }
         for transition in self.transitions.iter() {
-            if !self.states.contains(&transition.0.0) || !self.states.contains(&transition.1) {
+            if !self.states.contains_key(&transition.0.0) || !self.states.contains_key(&transition.1) {
                 return Err(format!("{:?} has invalid state(s)", transition));
             }
             if transition.0.1 == Symbol::EPSILON {
@@ -424,8 +430,8 @@ impl Automaton for Dfa {
         }
 
         let mut num_state: HashSet<usize> = HashSet::new();
-        for state in &self.states {
-            if num_state.contains(&state) {
+        for state in self.states.keys() {
+            if num_state.contains(state) {
                 return Err(format!("State {} exists twice", state));
             }
             num_state.insert(*state);
@@ -444,18 +450,18 @@ impl Automaton for Dfa {
                 }
                 break 'main false;
             }
-            break self.q_accepting.contains_key(&current);
+            break self.q_accepting.contains(&current);
         }
     }
 
     /// non-greedy currently
     fn find(&self, input: &str) -> Option<(usize, usize)> {
         let mut current = self.q_start;
-        let mut start = 0;
         for (pos, c) in input.chars().enumerate() {
             if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
                 current = *next;
-                if let Some(dist) = self.q_accepting.get(&current) {
+                if self.q_accepting.contains(&current) {
+                    let dist = self.states.get(&current).unwrap();
                     return Some((pos + 1 - dist, pos));
                 }
                 continue;
@@ -469,7 +475,7 @@ impl Automaton for Dfa {
 impl Debug for Dfa {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Dfa {{")?;
-        writeln!(f, "\tQ: {:?},", self.states)?;
+        writeln!(f, "\tQ: {:?},", self.states.keys())?;
 
         let mut transitions: Vec<_> = self.transitions.iter().collect();
         transitions.sort_by_key(|t| &t.0.0);

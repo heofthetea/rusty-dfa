@@ -127,17 +127,17 @@ pub mod test_parse_for_finding {
     fn test_simple_find() {
         let pattern = "aab|ac";
         let nfa = parse(pattern);
-        let nfa = &parse_for_dfa_finding(pattern);
         println!("{:?}", &nfa);
-        // assert!(nfa.find("aab").is`_some());
-        // assert!(nfa.find("ac").is_some());
-        // assert!(nfa.find("aac").is_some());
-        // assert!(nfa.find("abaac").is_some());
-        // assert!(nfa.find("cadaabf").is_some());
-        // assert!(nfa.find("ab").is_none());
-        // assert!(nfa.find("abc").is_none());
-        // assert!(nfa.find("cab").is_none());`
+        assert_eq!(nfa.find("aab").unwrap(), (0, 2));
+        assert_eq!(nfa.find("ac").unwrap(), (0, 1));
+        assert_eq!(nfa.find("aac").unwrap(), (1, 2));
+        assert_eq!(nfa.find("abaac").unwrap(), (3, 4));
+        assert_eq!(nfa.find("cadaabf").unwrap(), (3, 5));
+        assert!(nfa.find("ab").is_none());
+        assert!(nfa.find("abc").is_none());
+        assert!(nfa.find("cab").is_none());
 
+        let nfa = &parse_for_dfa_finding(pattern);
         // dfa
         let dfa = Dfa::from(&nfa);
         println!("{:?}", &dfa);
