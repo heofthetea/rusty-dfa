@@ -26,6 +26,21 @@ pub fn parse(pattern: &str) -> Nfa {
     _expr(pattern)
 }
 
+// todo that seems to be the approach
+// however I also need to do the thing where I
+// 1) re-introduce the alphabeet
+// 2) in the dfa: for everry state, for every letter of the alphabet, if there's
+//      no transition, add a transition back to the start
+// fixme causes infinite recursion due to epsilon loops for nfa
+pub fn parse_for_finding(pattern: &str) -> Nfa {
+    let mut nfa = parse(&pattern);
+    for state in &nfa.states {
+
+        nfa.transitions.insert((*state, Symbol::EPSILON, nfa.q_start));
+    }
+    nfa
+}
+
 fn _expr(pattern: &str) -> Nfa {
     let tokens: Vec<String> = _tokenize_expr(pattern);
     let mut nfa = _disjunct(&tokens[0]);
@@ -47,9 +62,10 @@ fn _disjunct(disjunct: &str) -> Nfa {
 fn _factor(factor: &str) -> Nfa {
     // aaaaaaaaaaaaaaaaaa every solution to this is so ugly wtf
     let (atom, suffix) = match factor.chars().rev().next() {
-        Some('*') | Some('+') | Some('?') if factor.len() > 1 => {
-            (&factor[..factor.len() - 1], Some(factor.chars().last().unwrap()))
-        }
+        Some('*') | Some('+') | Some('?') if factor.len() > 1 => (
+            &factor[..factor.len() - 1],
+            Some(factor.chars().last().unwrap()),
+        ),
         _ => (factor, None),
     };
 
@@ -61,8 +77,8 @@ fn _factor(factor: &str) -> Nfa {
     let mut nfa = _atom(atom);
     if let Some(c) = suffix {
         match c {
-            '?' => {nfa.optional()}
-            _ => nfa.klenee(c == '*')
+            '?' => nfa.optional(),
+            _ => nfa.klenee(c == '*'),
         }
     }
     nfa

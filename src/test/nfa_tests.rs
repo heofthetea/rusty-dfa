@@ -158,11 +158,11 @@ mod test_nfa_combinations {
         left.concat(right);
         assert!(left.validate().is_ok());
         println!("concat: {:?}", left);
-        assert!(left._accept(left.q_start, "ab"));
-        assert!(!left._accept(left.q_start, "a"));
-        assert!(!left._accept(left.q_start, "b"));
-        assert!(!left._accept(left.q_start, ""));
-        assert!(!left._accept(left.q_start, "abc"));
+        assert!(left.accept("ab"));
+        assert!(!left.accept("a"));
+        assert!(!left.accept("b"));
+        assert!(!left.accept(""));
+        assert!(!left.accept("abc"));
     }
 
     /// GIVEN: An NFA left accepting the language {"a"}
@@ -177,12 +177,12 @@ mod test_nfa_combinations {
         left.union(right);
         assert!(left.validate().is_ok());
         println!("union: {:?}", left);
-        assert!(left._accept(left.q_start, "a"));
-        assert!(left._accept(left.q_start, "b"));
-        assert!(!left._accept(left.q_start, "ab"));
-        assert!(!left._accept(left.q_start, ""));
-        assert!(!left._accept(left.q_start, "c"));
-        assert!(!left._accept(left.q_start, "abc"));
+        assert!(left.accept("a"));
+        assert!(left.accept("b"));
+        assert!(!left.accept("ab"));
+        assert!(!left.accept(""));
+        assert!(!left.accept("c"));
+        assert!(!left.accept("abc"));
     }
 
     /// GIVEN: An NFA accepting the language {"a"}
@@ -195,13 +195,13 @@ mod test_nfa_combinations {
         nfa.klenee(true);
         assert!(nfa.validate().is_ok());
         println!("klenee: {:?}", nfa);
-        assert!(nfa._accept(nfa.q_start, ""));
-        assert!(nfa._accept(nfa.q_start, "a"));
-        assert!(nfa._accept(nfa.q_start, "aa"));
-        assert!(nfa._accept(nfa.q_start, "aaa"));
-        assert!(!nfa._accept(nfa.q_start, "b"));
-        assert!(!nfa._accept(nfa.q_start, "ab"));
-        assert!(!nfa._accept(nfa.q_start, "ba"));
+        assert!(nfa.accept(""));
+        assert!(nfa.accept("a"));
+        assert!(nfa.accept("aa"));
+        assert!(nfa.accept("aaa"));
+        assert!(!nfa.accept("b"));
+        assert!(!nfa.accept("ab"));
+        assert!(!nfa.accept("ba"));
     }
 }
 

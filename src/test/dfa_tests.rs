@@ -10,10 +10,10 @@ mod test_powerset_construction {
         let dfa = Dfa::from(&nfa);
         println!("{:?}", dfa);
         assert!(dfa.validate().is_ok());
-        assert!(dfa._accept(dfa.q_start, "a"));
-        assert!(!dfa._accept(dfa.q_start, ""));
-        assert!(!dfa._accept(dfa.q_start, "aa"));
-        assert!(!dfa._accept(dfa.q_start, "b"));
+        assert!(dfa.accept("a"));
+        assert!(!dfa.accept(""));
+        assert!(!dfa.accept("aa"));
+        assert!(!dfa.accept("b"));
     }
     
     #[test]
@@ -23,12 +23,12 @@ mod test_powerset_construction {
         println!("{:?}", nfa);
         println!("{:?}", dfa);
         assert!(dfa.validate().is_ok());
-        assert!(dfa._accept(dfa.q_start, "abc"));
-        assert!(!dfa._accept(dfa.q_start, ""));
-        assert!(!dfa._accept(dfa.q_start, "ab"));
-        assert!(!dfa._accept(dfa.q_start, "bc"));
-        assert!(!dfa._accept(dfa.q_start, "ac"));
-        assert!(!dfa._accept(dfa.q_start, "abcde"));
+        assert!(dfa.accept("abc"));
+        assert!(!dfa.accept(""));
+        assert!(!dfa.accept("ab"));
+        assert!(!dfa.accept("bc"));
+        assert!(!dfa.accept("ac"));
+        assert!(!dfa.accept("abcde"));
     }
 
     #[test]
@@ -38,12 +38,12 @@ mod test_powerset_construction {
         println!("{:?}", nfa);
         println!("{:?}", dfa);
         assert!(dfa.validate().is_ok());
-        assert!(dfa._accept(dfa.q_start, ""));
-        assert!(dfa._accept(dfa.q_start, "a"));
-        assert!(dfa._accept(dfa.q_start, "aa"));
-        assert!(dfa._accept(dfa.q_start, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
-        assert!(!dfa._accept(dfa.q_start, "aaab"));
-        assert!(!dfa._accept(dfa.q_start, "b"));
+        assert!(dfa.accept(""));
+        assert!(dfa.accept("a"));
+        assert!(dfa.accept("aa"));
+        assert!(dfa.accept("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+        assert!(!dfa.accept("aaab"));
+        assert!(!dfa.accept("b"));
     }
 
     #[test]
@@ -54,12 +54,12 @@ mod test_powerset_construction {
         println!("{:?}", dfa);
         assert!(dfa.validate().is_ok());
         assert!(dfa.validate().is_ok());
-        assert!(dfa._accept(dfa.q_start, "a"));
-        assert!(dfa._accept(dfa.q_start, "b"));
-        assert!(!dfa._accept(dfa.q_start, "aa"));
-        assert!(!dfa._accept(dfa.q_start, ""));
-        assert!(!dfa._accept(dfa.q_start, "ab"));
-        assert!(!dfa._accept(dfa.q_start, "aaab"));
+        assert!(dfa.accept("a"));
+        assert!(dfa.accept("b"));
+        assert!(!dfa.accept("aa"));
+        assert!(!dfa.accept(""));
+        assert!(!dfa.accept("ab"));
+        assert!(!dfa.accept("aaab"));
     }
 
 }
@@ -78,16 +78,16 @@ pub mod test_dfa_matching {
         let nfa = parse(&pattern);
         let dfa = Dfa::from(&nfa);
         print!("{:?}", dfa);
-        assert!(dfa._accept(dfa.q_start, "b"));
-        assert!(dfa._accept(dfa.q_start, "ab"));
-        assert!(dfa._accept(dfa.q_start, "aaaab"));
-        assert!(dfa._accept(dfa.q_start, "baab"));
-        assert!(dfa._accept(dfa.q_start, "bb"));
+        assert!(dfa.accept("b"));
+        assert!(dfa.accept("ab"));
+        assert!(dfa.accept("aaaab"));
+        assert!(dfa.accept("baab"));
+        assert!(dfa.accept("bb"));
         // not matching
-        assert!(!dfa._accept(dfa.q_start, ""));
-        assert!(!dfa._accept(dfa.q_start, "bbab"));
-        assert!(!dfa._accept(dfa.q_start, "ba"));
-        assert!(!dfa._accept(dfa.q_start, "a"));
+        assert!(!dfa.accept(""));
+        assert!(!dfa.accept("bbab"));
+        assert!(!dfa.accept("ba"));
+        assert!(!dfa.accept("a"));
     }
 
     #[test]
@@ -96,16 +96,16 @@ pub mod test_dfa_matching {
         let nfa = parse(&pattern);
         let dfa = Dfa::from(&nfa);
         print!("{:?}", dfa);
-        assert!(dfa._accept(dfa.q_start, "b"));
-        assert!(dfa._accept(dfa.q_start, "aba"));
-        assert!(dfa._accept(dfa.q_start, "ba"));
-        assert!(dfa._accept(dfa.q_start, "c"));
-        assert!(dfa._accept(dfa.q_start, "ccccc"));
-        assert!(dfa._accept(dfa.q_start, "bc"));
+        assert!(dfa.accept("b"));
+        assert!(dfa.accept("aba"));
+        assert!(dfa.accept("ba"));
+        assert!(dfa.accept("c"));
+        assert!(dfa.accept("ccccc"));
+        assert!(dfa.accept("bc"));
         // not matching
-        assert!(!dfa._accept(dfa.q_start, ""));
-        assert!(!dfa._accept(dfa.q_start, "aab"));
-        assert!(!dfa._accept(dfa.q_start, "ac"));
+        assert!(!dfa.accept(""));
+        assert!(!dfa.accept("aab"));
+        assert!(!dfa.accept("ac"));
     }
 
     /// LADIES AND GENTLEMEN
@@ -116,7 +116,7 @@ pub mod test_dfa_matching {
         let nfa = parse(&pattern);
         let dfa = Dfa::from(&nfa);
         println!("{:?}", dfa);
-        assert!(dfa._accept(dfa.q_start, "aaaaaaaaaaaaaaaaaaaaaaaaa"))
+        assert!(dfa.accept("aaaaaaaaaaaaaaaaaaaaaaaaa"))
     }
 
     //////////////////////////////////////////////////////// FINDING ///////////////////////////////////////////////////////

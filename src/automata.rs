@@ -12,7 +12,7 @@ pub trait Automaton {
     /// Simulate a run of `self` on the word `input`.
     /// returns: true if `input` is accepted, false otherwise.
     /// Note: This algorithm accepts entire words, as by traditional theoretical definition
-    fn _accept(&self, state: usize, input: &str) -> bool;
+    fn accept(&self, input: &str) -> bool;
 
     /// Find whether `input` contains a word of this automaton's language anywhere.
     /// If so, returns the index of where the match starts.
@@ -86,6 +86,28 @@ impl Nfa {
             .iter()
             .filter(|(f, w, _)| *f == from && (*w == c || *w == Symbol::EPSILON))
             .collect()
+    }
+
+    fn _accept(&self, state: usize, word: &str, depth: usize, full_accept: bool) -> Option<usize> {
+        if word.is_empty() || !full_accept {
+            let ec = self.ec(state);
+            if ec.iter().find(|q| self.q_accepting.contains(q)).is_some() {
+                return Some(depth);
+            }
+        }
+        if let Some(c) = word.chars().nth(0) {
+            for transition in self.find_transitions(state, CHAR(c)) {
+                let from = match transition.1 {
+                    CHAR(_) => 1,
+                    Symbol::EPSILON | Symbol::EMPTY => 0,
+                };
+                let end = self._accept(transition.2, &word[from..], depth + 1, full_accept);
+                if end.is_some() {
+                    return end;
+                }
+            }
+        }
+        None
     }
 
     /////////////////////////////////////////////// CONSTRUCTION METHODS ///////////////////////////////////////////////
@@ -243,26 +265,19 @@ impl Automaton for Nfa {
 
     /// Simulate a run of `self` on the word `input`.
     /// Uses simple backtracking to get hold of NFAs non-determinism
-    fn _accept(&self, state: usize, word: &str) -> bool {
-        if word.is_empty() {
-            let ec = self.ec(state);
-            return ec.iter().find(|q| self.q_accepting.contains(q)).is_some();
-        }
-        let sc = CHAR(word.chars().nth(0).unwrap());
-        for transition in self.find_transitions(state, sc) {
-            let from = match transition.1 {
-                CHAR(_) => 1,
-                Symbol::EPSILON | Symbol::EMPTY => 0,
-            };
-            if self._accept(transition.2, &word[from..]) {
-                return true;
-            }
-        }
-        false
+    /// WARNING: this will cause infinite recursion on epsilon cycles lol
+    /// Maybe I can fix that by using epsilon closures instead of raw transitions...
+    fn accept(&self, word: &str) -> bool {
+        self._accept(self.q_start, word, 0, true).is_some()
     }
 
     fn find(&self, input: &str) -> Option<(usize, usize)> {
-        unimplemented!()
+        for (id, c) in input.chars().enumerate() {
+            if let Some(end) = self._accept(self.q_start, &input[id..], id, false) {
+                return Some((id, end));
+            }
+        }
+        None
     }
 }
 
@@ -396,8 +411,8 @@ impl Automaton for Dfa {
         Ok(())
     }
 
-    fn _accept(&self, state: usize, input: &str) -> bool {
-        let mut current = state;
+    fn accept(&self, input: &str) -> bool {
+        let mut current = self.q_start;
         'main: loop {
             for c in input.chars() {
                 if let Some(next) = self.transitions.get(&(current, CHAR(c))) {

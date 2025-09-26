@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test_parse {
-    use crate::automata::{reset_state_counter, Automaton, Nfa};
+    use crate::automata::{Automaton, Nfa, reset_state_counter};
     use crate::parse::parse;
 
     #[test]
@@ -8,17 +8,17 @@ mod test_parse {
         let pattern = "a*|(ab(a|b)*)b|b";
         let nfa = parse(&pattern);
         println!("{:?}", nfa);
-        assert!(nfa._accept(nfa.q_start, "a"));
-        assert!(nfa._accept(nfa.q_start, "aaaa"));
-        assert!(nfa._accept(nfa.q_start, "abb"));
-        assert!(nfa._accept(nfa.q_start, "abab"));
-        assert!(nfa._accept(nfa.q_start, "abbb"));
-        assert!(nfa._accept(nfa.q_start, "b"));
-        assert!(!nfa._accept(nfa.q_start, "c"));
+        assert!(nfa.accept("a"));
+        assert!(nfa.accept("aaaa"));
+        assert!(nfa.accept("abb"));
+        assert!(nfa.accept("abab"));
+        assert!(nfa.accept("abbb"));
+        assert!(nfa.accept("b"));
+        assert!(!nfa.accept("c"));
         // not matching
-        assert!(!nfa._accept(nfa.q_start, "ac"));
-        assert!(!nfa._accept(nfa.q_start, "ba"));
-        assert!(!nfa._accept(nfa.q_start, "abaaabbbbbaaaabbbbbabbaabba"))
+        assert!(!nfa.accept("ac"));
+        assert!(!nfa.accept("ba"));
+        assert!(!nfa.accept("abaaabbbbbaaaabbbbbabbaabba"))
     }
 
     #[test]
@@ -27,9 +27,9 @@ mod test_parse {
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
 
-        assert!(nfa._accept(nfa.q_start, "a"));
-        assert!(nfa._accept(nfa.q_start, "aa"));
-        assert!(!nfa._accept(nfa.q_start, ""));
+        assert!(nfa.accept("a"));
+        assert!(nfa.accept("aa"));
+        assert!(!nfa.accept(""));
     }
 
     #[test]
@@ -38,9 +38,9 @@ mod test_parse {
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
 
-        assert!(nfa._accept(nfa.q_start, ""));
-        assert!(nfa._accept(nfa.q_start, "a"));
-        assert!(!nfa._accept(nfa.q_start, "aa"));
+        assert!(nfa.accept(""));
+        assert!(nfa.accept("a"));
+        assert!(!nfa.accept("aa"));
     }
 
     #[test]
@@ -49,11 +49,11 @@ mod test_parse {
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
 
-        assert!(nfa._accept(nfa.q_start, "b"));
-        assert!(nfa._accept(nfa.q_start, "ab"));
-        assert!(nfa._accept(nfa.q_start, "abbb"));
-        assert!(!nfa._accept(nfa.q_start, ""));
-        assert!(!nfa._accept(nfa.q_start, "aab"));
+        assert!(nfa.accept("b"));
+        assert!(nfa.accept("ab"));
+        assert!(nfa.accept("abbb"));
+        assert!(!nfa.accept(""));
+        assert!(!nfa.accept("aab"));
     }
 
     #[test]
@@ -62,32 +62,32 @@ mod test_parse {
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
 
-        assert!(nfa._accept(nfa.q_start, "b"));
-        assert!(nfa._accept(nfa.q_start, "b"));
-        assert!(nfa._accept(nfa.q_start, "bbb"));
-        assert!(nfa._accept(nfa.q_start, "bc"));
-        assert!(nfa._accept(nfa.q_start, "bc"));
-        assert!(nfa._accept(nfa.q_start, "bbc"));
+        assert!(nfa.accept("b"));
+        assert!(nfa.accept("b"));
+        assert!(nfa.accept("bbb"));
+        assert!(nfa.accept("bc"));
+        assert!(nfa.accept("bc"));
+        assert!(nfa.accept("bbc"));
 
-        assert!(!nfa._accept(nfa.q_start, ""));
-        assert!(!nfa._accept(nfa.q_start, "bcc"));
+        assert!(!nfa.accept(""));
+        assert!(!nfa.accept("bcc"));
     }
 
     #[test]
     fn test_random_pattern_containing_second_iteration_syntax() {
-        let pattern =  "a?b+(a|c)?|c+";
+        let pattern = "a?b+(a|c)?|c+";
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
-        assert!(nfa._accept(nfa.q_start, "b"));
-        assert!(nfa._accept(nfa.q_start, "aba"));
-        assert!(nfa._accept(nfa.q_start, "ba"));
-        assert!(nfa._accept(nfa.q_start, "c"));
-        assert!(nfa._accept(nfa.q_start, "ccccc"));
-        assert!(nfa._accept(nfa.q_start, "bc"));
+        assert!(nfa.accept("b"));
+        assert!(nfa.accept("aba"));
+        assert!(nfa.accept("ba"));
+        assert!(nfa.accept("c"));
+        assert!(nfa.accept("ccccc"));
+        assert!(nfa.accept("bc"));
         // not matching
-        assert!(!nfa._accept(nfa.q_start, ""));
-        assert!(!nfa._accept(nfa.q_start, "aab"));
-        assert!(!nfa._accept(nfa.q_start, "ac"));
+        assert!(!nfa.accept(""));
+        assert!(!nfa.accept("aab"));
+        assert!(!nfa.accept("ac"));
     }
 
     #[test]
@@ -96,16 +96,16 @@ mod test_parse {
         let pattern = "(a|b)?a*b";
         let nfa = parse(&pattern);
         print!("{:?}", nfa);
-        assert!(nfa._accept(nfa.q_start, "b"));
-        assert!(nfa._accept(nfa.q_start, "ab"));
-        assert!(nfa._accept(nfa.q_start, "aaaab"));
-        assert!(nfa._accept(nfa.q_start, "baab"));
-        assert!(nfa._accept(nfa.q_start, "bb"));
+        assert!(nfa.accept("b"));
+        assert!(nfa.accept("ab"));
+        assert!(nfa.accept("aaaab"));
+        assert!(nfa.accept("baab"));
+        assert!(nfa.accept("bb"));
         // not matching
-        assert!(!nfa._accept(nfa.q_start, ""));
-        assert!(!nfa._accept(nfa.q_start, "bbab"));
-        assert!(!nfa._accept(nfa.q_start, "ba"));
-        assert!(!nfa._accept(nfa.q_start, "a"));
+        assert!(!nfa.accept(""));
+        assert!(!nfa.accept("bbab"));
+        assert!(!nfa.accept("ba"));
+        assert!(!nfa.accept("a"));
     }
 
     #[test]
@@ -113,6 +113,40 @@ mod test_parse {
         let pattern = "a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa";
         let nfa = parse(&pattern);
         println!("{:?}", nfa);
-        assert!(nfa._accept(nfa.q_start, "aaaaaaaaaaaaaaaaaaaaaaaaa"))
+        assert!(nfa.accept("aaaaaaaaaaaaaaaaaaaaaaaaa"))
+    }
+}
+/////////////////////////////////////////////////// PARSE FOR FINDING //////////////////////////////////////////////////
+
+#[cfg(test)]
+pub mod test_parse_for_finding {
+    use crate::automata::{Automaton, Dfa};
+    use crate::parse::{parse, parse_for_finding};
+
+    #[test]
+    fn test_simple_find() {
+        let pattern = "aab|ac";
+        let nfa = parse(pattern);
+        println!("{:?}", &nfa);
+        assert!(nfa.find("aab").is_some());
+        assert!(nfa.find("ac").is_some());
+        assert!(nfa.find("aac").is_some());
+        assert!(nfa.find("abaac").is_some());
+        assert!(nfa.find("cadaabf").is_some());
+        assert!(nfa.find("ab").is_none());
+        assert!(nfa.find("abc").is_none());
+        assert!(nfa.find("cab").is_none());
+
+        // dfa
+        let dfa = Dfa::from(&nfa);
+        println!("{:?}", &dfa);
+        assert!(dfa.accept("ac"));
+        assert!(dfa.accept("aac"));
+        assert!(dfa.accept("abaac"));
+        assert!(dfa.accept("cadaabf"));
+        // not matching
+        assert!(!dfa.accept("ab"));
+        assert!(!dfa.accept("abc"));
+        assert!(!dfa.accept("cab"));
     }
 }
