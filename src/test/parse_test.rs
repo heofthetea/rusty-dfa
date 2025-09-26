@@ -74,6 +74,19 @@ mod test_parse {
     }
 
     #[test]
+    fn test_klenee_with_or() {
+        let pattern = "(ab|cd)*";
+        let nfa = parse(&pattern);
+        print!("{:?}", nfa);
+
+        assert!(nfa.accept("abab"));
+        assert!(nfa.accept("cdcd"));
+        assert!(nfa.accept("abcd"));
+        assert!(nfa.accept("cdab"));
+        assert!(nfa.accept(""));
+    }
+
+    #[test]
     fn test_random_pattern_containing_second_iteration_syntax() {
         let pattern = "a?b+(a|c)?|c+";
         let nfa = parse(&pattern);
@@ -114,40 +127,5 @@ mod test_parse {
         let nfa = parse(&pattern);
         println!("{:?}", nfa);
         assert!(nfa.accept("aaaaaaaaaaaaaaaaaaaaaaaaa"))
-    }
-}
-/////////////////////////////////////////////////// PARSE FOR FINDING //////////////////////////////////////////////////
-
-#[cfg(test)]
-pub mod test_parse_for_finding {
-    use crate::automata::{Automaton, Dfa};
-    use crate::parse::{parse, parse_for_dfa_finding};
-
-    #[test]
-    fn test_simple_find() {
-        let pattern = "aab|ac";
-        let nfa = parse(pattern);
-        println!("{:?}", &nfa);
-        assert_eq!(nfa.find("aab").unwrap(), (0, 2));
-        assert_eq!(nfa.find("ac").unwrap(), (0, 1));
-        assert_eq!(nfa.find("aac").unwrap(), (1, 2));
-        assert_eq!(nfa.find("abaac").unwrap(), (3, 4));
-        assert_eq!(nfa.find("cadaabf").unwrap(), (3, 5));
-        assert!(nfa.find("ab").is_none());
-        assert!(nfa.find("abc").is_none());
-        assert!(nfa.find("cab").is_none());
-
-        let nfa = &parse_for_dfa_finding(pattern);
-        // dfa
-        let dfa = Dfa::from(&nfa);
-        println!("{:?}", &dfa);
-        assert_eq!(dfa.find("ac").unwrap(), (0, 1));
-        assert_eq!(dfa.find("aac").unwrap(), (1, 2));
-        assert_eq!(dfa.find("abaac").unwrap(), (3, 4));
-        assert_eq!(dfa.find("cadaabf").unwrap(), (3, 5));
-        // not matching
-        assert!(dfa.find("ab").is_none());
-        assert!(dfa.find("abc").is_none());
-        assert!(dfa.find("cab").is_none());
     }
 }

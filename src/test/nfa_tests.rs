@@ -240,5 +240,78 @@ mod test_nfa_to_dfa {
         assert_eq!(set.len(), 4)
 
     }
+}
 
+#[cfg(test)]
+mod test_reverse {
+    use crate::automata::Automaton;
+    use crate::parse::parse;
+
+    #[test]
+    fn test_reverse_simple() {
+        let nfa = parse("abc");
+        let reversed = nfa.reversed();
+        assert!(reversed.accept("cba"));
+        assert!(!reversed.accept("cb"));
+        assert!(!reversed.accept("ab"));
+        assert!(!reversed.accept(""));
+    }
+
+    #[test]
+    fn test_reverse_or() {
+        let nfa = parse("a|b|abc");
+        let reversed = nfa.reversed();
+        assert!(reversed.accept("cba"));
+        assert!(reversed.accept("a"));
+        assert!(reversed.accept("b"));
+        assert!(!reversed.accept("c"));
+        assert!(!reversed.accept("cbaa"));
+        assert!(!reversed.accept("cbab"));
+        assert!(!reversed.accept(""));
+    }
+
+    #[test]
+    fn test_reverse_klenee() {
+        let nfa = parse("a*");
+        let reversed = nfa.reversed();
+        assert!(reversed.accept(""));
+        assert!(reversed.accept("a"));
+        assert!(reversed.accept("aaa"));
+        assert!(!reversed.accept("b"));
+    }
+
+    #[test]
+    fn test_reverse_nested_klenee() {
+        let nfa = parse("(ab)*");
+        let reversed = nfa.reversed();
+        println!("{:?}", &reversed);
+        assert!(reversed.accept(""));
+        assert!(reversed.accept("ba"));
+        assert!(reversed.accept("baba"));
+        assert!(reversed.accept("bababa"));
+        assert!(!reversed.accept("a"));
+        assert!(!reversed.accept("b"));
+        assert!(!reversed.accept("bababaa"));
+        assert!(!reversed.accept("bababab"));
+    }
+
+    #[test]
+    fn test_complex_reverse() {
+        let nfa = parse("a?(bc|d)a*b|(ab|cd)*");
+        let reversed = nfa.reversed();
+
+        assert!(reversed.accept(""));
+        assert!(reversed.accept("dcdc"));
+        assert!(reversed.accept("dcba"));
+        assert!(reversed.accept("babadc"));
+        assert!(reversed.accept("bcb"));
+        assert!(reversed.accept("bcba"));
+        assert!(reversed.accept("bda"));
+        assert!(reversed.accept("baaaaaaaaacb"));
+        assert!(reversed.accept("baaaaaaaaada"));
+        // not match
+        assert!(!reversed.accept("bcbaa"));
+        assert!(!reversed.accept("ada"));
+        assert!(!reversed.accept("ada"));
+    }
 }
