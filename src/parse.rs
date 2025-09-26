@@ -31,14 +31,14 @@ pub fn parse(pattern: &str) -> Nfa {
 // 1) re-introduce the alphabeet
 // 2) in the dfa: for everry state, for every letter of the alphabet, if there's
 //      no transition, add a transition back to the start
-// fixme causes infinite recursion due to epsilon loops for nfa
-pub fn parse_for_finding(pattern: &str) -> Nfa {
+/// Parse `pattern` into an `Nfa` so that it can be used to construct a Dfa that finds a match
+/// instead of just accepting a word.
+/// WARNING: this Nfa cannot be run using `Nfa::find`, as it causes infinite recursion!
+pub fn parse_for_dfa_finding(pattern: &str) -> Nfa {
     let mut nfa = parse(&pattern);
-    for state in &nfa.states {
-
-        nfa.transitions.insert((*state, Symbol::EPSILON, nfa.q_start));
-    }
+    nfa.to_finding();
     nfa
+
 }
 
 fn _expr(pattern: &str) -> Nfa {

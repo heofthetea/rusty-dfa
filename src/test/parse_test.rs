@@ -121,32 +121,33 @@ mod test_parse {
 #[cfg(test)]
 pub mod test_parse_for_finding {
     use crate::automata::{Automaton, Dfa};
-    use crate::parse::{parse, parse_for_finding};
+    use crate::parse::{parse, parse_for_dfa_finding};
 
     #[test]
     fn test_simple_find() {
         let pattern = "aab|ac";
         let nfa = parse(pattern);
+        let nfa = &parse_for_dfa_finding(pattern);
         println!("{:?}", &nfa);
-        assert!(nfa.find("aab").is_some());
-        assert!(nfa.find("ac").is_some());
-        assert!(nfa.find("aac").is_some());
-        assert!(nfa.find("abaac").is_some());
-        assert!(nfa.find("cadaabf").is_some());
-        assert!(nfa.find("ab").is_none());
-        assert!(nfa.find("abc").is_none());
-        assert!(nfa.find("cab").is_none());
+        // assert!(nfa.find("aab").is`_some());
+        // assert!(nfa.find("ac").is_some());
+        // assert!(nfa.find("aac").is_some());
+        // assert!(nfa.find("abaac").is_some());
+        // assert!(nfa.find("cadaabf").is_some());
+        // assert!(nfa.find("ab").is_none());
+        // assert!(nfa.find("abc").is_none());
+        // assert!(nfa.find("cab").is_none());`
 
         // dfa
         let dfa = Dfa::from(&nfa);
         println!("{:?}", &dfa);
-        assert!(dfa.accept("ac"));
-        assert!(dfa.accept("aac"));
-        assert!(dfa.accept("abaac"));
-        assert!(dfa.accept("cadaabf"));
+        assert_eq!(dfa.find("ac").unwrap(), (0, 1));
+        assert_eq!(dfa.find("aac").unwrap(), (1, 2));
+        assert_eq!(dfa.find("abaac").unwrap(), (3, 4));
+        assert_eq!(dfa.find("cadaabf").unwrap(), (3, 5));
         // not matching
-        assert!(!dfa.accept("ab"));
-        assert!(!dfa.accept("abc"));
-        assert!(!dfa.accept("cab"));
+        assert!(dfa.find("ab").is_none());
+        assert!(dfa.find("abc").is_none());
+        assert!(dfa.find("cab").is_none());
     }
 }

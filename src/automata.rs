@@ -24,6 +24,7 @@ pub struct Nfa {
     pub transitions: HashSet<(usize, Symbol, usize)>,
     pub q_start: usize,
     pub q_accepting: HashSet<usize>,
+    pub alphabet: HashSet<Symbol>,
 }
 
 impl Nfa {
@@ -33,11 +34,18 @@ impl Nfa {
         q_start: usize,
         q_accepting: HashSet<usize>,
     ) -> Nfa {
+        let alphabet = transitions
+            .iter()
+            .map(|(_, w, _)| w)
+            .filter(|w| **w != Symbol::EPSILON)
+            .cloned()
+            .collect();
         let nfa = Nfa {
             states,
             transitions,
             q_start,
             q_accepting,
+            alphabet,
         };
         match nfa.validate() {
             Ok(_) => {}
@@ -138,6 +146,7 @@ impl Nfa {
     pub fn concat(&mut self, other: Nfa) {
         self.states.extend(&other.states);
         self.transitions.extend(other.transitions);
+        self.alphabet.extend(other.alphabet);
         for f in self.q_accepting.iter() {
             self.transitions
                 .insert((*f, Symbol::EPSILON, other.q_start));
@@ -148,6 +157,7 @@ impl Nfa {
     pub fn union(&mut self, other: Nfa) {
         self.states.extend(&other.states);
         self.transitions.extend(other.transitions);
+        self.alphabet.extend(other.alphabet);
 
         let union_state = next_state();
         self.states.push(union_state);
@@ -158,6 +168,16 @@ impl Nfa {
         self.q_start = union_state;
 
         self.q_accepting.extend(other.q_accepting);
+    }
+
+    pub fn to_finding(&mut self) {
+        let source = next_state();
+        self.states.push(source);
+        for s in &self.alphabet {
+            self.transitions.insert((source, s.clone(), source));
+        }
+        self.transitions.insert((source, Symbol::EPSILON, self.q_start));
+        self.q_start = source;
     }
 
     /////////////////////////////////////////////// POWERSET CONSTRUCTION //////////////////////////////////////////////
@@ -295,6 +315,7 @@ impl Debug for Nfa {
         writeln!(f, "\t}}")?;
         writeln!(f, "\tq_0: {:?},", self.q_start)?;
         writeln!(f, "\tF: {:?},", self.q_accepting)?;
+        writeln!(f, "\tE: {:?}", self.alphabet)?;
         write!(f, "}}")
     }
 }
@@ -306,7 +327,8 @@ pub struct Dfa {
     // using a hashmap should make the thing go speeeeed
     transitions: HashMap<(usize, Symbol), usize>,
     pub q_start: usize,
-    q_accepting: HashSet<usize>,
+    // state -> distance from q_0
+    q_accepting: HashMap<usize, usize>,
 }
 
 impl Dfa {
@@ -314,7 +336,7 @@ impl Dfa {
         states: Vec<usize>,
         transitions: HashMap<(usize, Symbol), usize>,
         q_start: usize,
-        q_accepting: HashSet<usize>,
+        q_accepting: HashMap<usize, usize>,
     ) -> Dfa {
         Dfa {
             states,
@@ -331,21 +353,24 @@ impl Dfa {
         let new_q0_id = next_state();
 
         let mut states: BiMap<usize, BTreeSet<usize>> = BiMap::new();
+        let mut distance_to_q0: HashMap<usize, usize> = HashMap::new();
         states.insert(new_q0_id.clone(), new_q0.clone());
+        distance_to_q0.insert(new_q0_id.clone(), 0);
 
         let mut dfa = Dfa::new(
             Vec::from([new_q0_id]),
             HashMap::new(),
             new_q0_id,
-            HashSet::new(),
+            HashMap::new()
         );
         if nfa.contains_accepting_state(&new_q0) {
-            dfa.q_accepting.insert(new_q0_id);
+            dfa.q_accepting.insert(new_q0_id, 0);
         }
         drop(new_q0);
 
         let mut i: usize = 0;
         while let Some(state) = dfa.states.get(i).cloned() {
+            // states in the nfa
             let old_states = states.get_by_left(&state).unwrap();
             let transitions = nfa.successors_multiple(&old_states, &successors);
             for (with, target) in transitions {
@@ -354,17 +379,15 @@ impl Dfa {
                     *state
                 } else {
                     let new_state = next_state();
+                    let dist = *distance_to_q0.get(&state).unwrap() + 1;
+                    distance_to_q0.insert(new_state, dist);
                     if nfa.contains_accepting_state(&target) {
-                        dfa.q_accepting.insert(new_state);
+                        dfa.q_accepting.insert(new_state, dist);
                     }
                     states.insert(new_state, target);
                     dfa.states.push(new_state);
                     new_state
                 };
-                // only for debugging purposes
-                if dfa.transitions.contains_key(&(state, with.clone())) {
-                    panic!("{} already has a transition for symbol {}", state, with)
-                }
                 // insert the appropriate transition to this state
                 dfa.transitions.insert((state, with.clone()), to);
             }
@@ -385,7 +408,7 @@ impl Automaton for Dfa {
         if !self.states.contains(&self.q_start) {
             return Err(String::from("q_0 ∉ Q"));
         }
-        if self.q_accepting.iter().any(|q| !self.states.contains(q)) {
+        if self.q_accepting.keys().any(|q| !self.states.contains(q)) {
             return Err(String::from("F ⊄ Q"));
         }
         for transition in self.transitions.iter() {
@@ -421,33 +444,25 @@ impl Automaton for Dfa {
                 }
                 break 'main false;
             }
-            break self.q_accepting.contains(&current);
+            break self.q_accepting.contains_key(&current);
         }
     }
 
     /// non-greedy currently
     fn find(&self, input: &str) -> Option<(usize, usize)> {
-        let mut current = &self.q_start;
-        let mut start: Option<usize> = None;
-        let mut end: Option<usize> = None;
-        for (id, c) in input.chars().enumerate() {
-            if let Some(next) = self.transitions.get(&(*current, CHAR(c))) {
-                if current == &self.q_start {
-                    start = Some(id);
+        let mut current = self.q_start;
+        let mut start = 0;
+        for (pos, c) in input.chars().enumerate() {
+            if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
+                current = *next;
+                if let Some(dist) = self.q_accepting.get(&current) {
+                    return Some((pos + 1 - dist, pos));
                 }
-                if self.q_accepting.contains(&current) {
-                    end = Some(id);
-                    break;
-                }
-                current = next;
                 continue;
             }
-            current = &self.q_start;
+            current = self.q_start;
         }
-        if end.is_none() {
-            return None;
-        }
-        Option::Some((start.unwrap(), end.unwrap()))
+        None
     }
 }
 

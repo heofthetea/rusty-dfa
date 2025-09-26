@@ -70,7 +70,7 @@ mod test_powerset_construction {
 #[cfg(test)]
 pub mod test_dfa_matching {
     use crate::automata::{Dfa, Automaton};
-    use crate::parse::parse;
+    use crate::parse::{parse, parse_for_dfa_finding};
 
     #[test]
     fn test_fsa_uebung_2_39() {
@@ -131,7 +131,7 @@ pub mod test_dfa_matching {
     #[test]
     fn i_think_this_will_break() {
         let pattern = "aab|ac";
-        let dfa = Dfa::from(&parse(&pattern));
+        let dfa = Dfa::from(&parse_for_dfa_finding(&pattern));
         print!("{:?}", dfa);
         
         assert!(dfa.find("aac").is_some());
