@@ -86,4 +86,33 @@ pub mod test_for_finding {
         assert!(dfa.find("a", &dfa_reverse).is_none());
         assert!(dfa.find("", &dfa_reverse).is_none());
     }
+
+    #[test]
+    fn test_klenee_in_the_middle() {
+        let pattern = "ba*b";
+        let mut nfa = parse(pattern);
+        println!("{:?}", &nfa);
+        assert_eq!(nfa.find("bb").unwrap(), (0, 1));
+        assert_eq!(nfa.find("bab").unwrap(), (0, 2));
+        assert_eq!(nfa.find("baaaaab").unwrap(), (0, 6));
+        assert!(nfa.find("").is_none());
+        assert!(nfa.find("a").is_none());
+        assert!(nfa.find("b").is_none());
+        assert!(nfa.find("ab").is_none());
+        assert!(nfa.find("ba").is_none());
+
+        let reversed = nfa.reversed();
+        nfa.to_finding();
+        let dfa = Dfa::from(&nfa);
+        let dfa_reverse = Dfa::from(&reversed);
+        println!("{:?}", &dfa);
+        assert_eq!(dfa.find("bb", &dfa_reverse).unwrap(), (0, 1));
+        assert_eq!(dfa.find("bab", &dfa_reverse).unwrap(), (0, 2));
+        assert_eq!(dfa.find("baaaaab", &dfa_reverse).unwrap(), (0, 6));
+        assert!(dfa.find("", &dfa_reverse).is_none());
+        assert!(dfa.find("a", &dfa_reverse).is_none());
+        assert!(dfa.find("b", &dfa_reverse).is_none());
+        assert!(dfa.find("ab", &dfa_reverse).is_none());
+        assert!(dfa.find("ba", &dfa_reverse).is_none());
+    }
 }
