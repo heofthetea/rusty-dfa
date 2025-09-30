@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod test_powerset_construction {
-    use std::collections::{HashMap, HashSet};
-    use crate::automata::{Automaton, Dfa, Nfa, Symbol};
+    use crate::automata::automaton::{Symbol, Automaton};
+    use crate::automata::dfa::Dfa;
+    use crate::automata::nfa::Nfa;
     use crate::parse::parse;
     
     #[test]
@@ -69,7 +70,8 @@ mod test_powerset_construction {
 
 #[cfg(test)]
 pub mod test_dfa_matching {
-    use crate::automata::{Dfa, Automaton};
+    use crate::automata::automaton::Automaton;
+    use crate::automata::dfa::Dfa;
     use crate::parse::{parse};
 
     #[test]

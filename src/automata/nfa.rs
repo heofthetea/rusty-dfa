@@ -1,24 +1,7 @@
-use crate::automata::Symbol::CHAR;
-use bimap::BiMap;
-use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::fmt::{Debug, Display, Formatter, Write};
-
-pub trait Automaton {
-    /// Validate the `Automaton`
-    /// returns: Ok(()) if valid, Err(reason) if not
-    fn validate(&self) -> Result<(), String>;
-
-    /// Simulate a run of `self` on the word `input`.
-    /// returns: true if `input` is accepted, false otherwise.
-    /// Note: This method accepts entire words, as by traditional theoretical definition
-    fn accept(&self, input: &str) -> bool;
-
-    // yeah this makes no sense this entire trait makes no sense to be honest lol
-    // /// Find whether `input` contains a word of this automaton's language anywhere.
-    // /// If so, returns the index of where the match starts.
-    // fn find(&self, input: &str) -> Option<(usize, usize)>;
-}
+use Symbol::CHAR;
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::fmt::{Debug, Formatter, Write};
+use crate::automata::automaton::{Symbol, Automaton, next_state, next_states};
 
 pub struct Nfa {
     pub states: Vec<usize>,
@@ -254,7 +237,7 @@ impl Nfa {
     }
 
     /// Calculate all possible successor states for a single state
-    fn successors_single(&self) -> HashMap<(usize, Symbol), BTreeSet<usize>> {
+    pub(crate) fn successors_single(&self) -> HashMap<(usize, Symbol), BTreeSet<usize>> {
         let mut successors: HashMap<(usize, Symbol), BTreeSet<usize>> = HashMap::new();
 
         for state in &self.states {
@@ -270,7 +253,7 @@ impl Nfa {
     }
 
     /// Calculate all possible successor states for a set of `states`
-    fn successors_multiple(
+    pub(crate) fn successors_multiple(
         &self,
         states: &BTreeSet<usize>,
         successors_single: &HashMap<(usize, Symbol), BTreeSet<usize>>,
@@ -292,7 +275,7 @@ impl Nfa {
         successors_by_symbol
     }
 
-    fn contains_accepting_state(&self, states: &BTreeSet<usize>) -> bool {
+    pub(crate) fn contains_accepting_state(&self, states: &BTreeSet<usize>) -> bool {
         for partial in states {
             if self.q_accepting.contains(partial) {
                 return true;
@@ -355,224 +338,3 @@ impl Debug for Nfa {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct Dfa {
-    states: Vec<usize>,
-    // using a hashmap should make the thing go speeeeed
-    transitions: HashMap<(usize, Symbol), usize>,
-    pub q_start: usize,
-    q_accepting: HashSet<usize>,
-}
-
-impl Dfa {
-    pub fn new(
-        states: Vec<usize>,
-        transitions: HashMap<(usize, Symbol), usize>,
-        q_start: usize,
-        q_accepting: HashSet<usize>,
-    ) -> Dfa {
-        Dfa {
-            states,
-            transitions,
-            q_start,
-            q_accepting,
-        }
-    }
-
-    /// Powerset Construction of a DFA from the passed `Nfa`.
-    pub fn from(nfa: &Nfa) -> Dfa {
-        let successors = nfa.successors_single();
-        let new_q0: BTreeSet<usize> = nfa.ec(nfa.q_start).drain(..).collect();
-        let new_q0_id = next_state();
-
-        let mut id_to_state_set: BiMap<usize, BTreeSet<usize>> = BiMap::new();
-        id_to_state_set.insert(new_q0_id.clone(), new_q0.clone());
-
-        let mut dfa = Dfa::new(vec![new_q0_id], HashMap::new(), new_q0_id, HashSet::new());
-        if nfa.contains_accepting_state(&new_q0) {
-            dfa.q_accepting.insert(new_q0_id);
-        }
-        drop(new_q0);
-
-        let mut i: usize = 0;
-        while let Some(state) = dfa.states.get(i).cloned() {
-            // states in the nfa
-            let old_states = id_to_state_set.get_by_left(&state).unwrap();
-            let transitions = nfa.successors_multiple(&old_states, &successors);
-            for (with, target) in transitions {
-                let to = if let Some(state) = id_to_state_set.get_by_right(&target) {
-                    // state set has been previously generated
-                    *state
-                } else {
-                    let new_state = next_state();
-                    dfa.states.push(new_state);
-                    if nfa.contains_accepting_state(&target) {
-                        dfa.q_accepting.insert(new_state);
-                    }
-                    id_to_state_set.insert(new_state, target);
-                    new_state
-                };
-                // insert the appropriate transition to this state
-                dfa.transitions.insert((state, with.clone()), to);
-            }
-            i += 1
-        }
-
-        dfa
-    }
-
-    /// non-greedy currently
-    fn _find(&self, input: &str) -> Option<(usize, usize)> {
-        let mut current = self.q_start;
-        let mut start: usize = 0; // not the actual start of the match - just a lower bound
-        for (pos, c) in input.chars().enumerate() {
-            if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
-                current = *next;
-                if self.q_accepting.contains(&current) {
-                    return Some((start, pos));
-                }
-                continue;
-            }
-            current = self.q_start;
-            start = 0;
-        }
-        None
-    }
-
-    pub fn find(&self, input: &str, reversed: &Dfa) -> Option<(usize, usize)> {
-        if let Some((_, end)) = self._find(input) {
-            let reversed_input: String = input.chars().rev().collect();
-            let rev_end = input.len() - end - 1;
-            // should always find a match because of reversal
-            let (_, start) = reversed._find(&reversed_input[rev_end..]).unwrap();
-            return Some((&reversed_input[rev_end..].len() - start - 1, end))
-
-        }
-        None
-    }
-
-    // may not actually be needed we'll see
-    pub fn minimize(&self) {
-        todo!()
-    }
-}
-
-impl Automaton for Dfa {
-    fn validate(&self) -> Result<(), String> {
-        if !self.states.contains(&self.q_start) {
-            return Err(String::from("q_0 ∉ Q"));
-        }
-        if self.q_accepting.iter().any(|q| !self.states.contains(q)) {
-            return Err(String::from("F ⊄ Q"));
-        }
-        for transition in self.transitions.iter() {
-            if !self.states.contains(&transition.0.0) || !self.states.contains(&transition.1) {
-                return Err(format!("{:?} has invalid state(s)", transition));
-            }
-            if transition.0.1 == Symbol::EPSILON {
-                return Err(format!(
-                    "{:?} is a forbidden epsilon-transition",
-                    transition
-                ));
-            }
-        }
-
-        let mut num_state: HashSet<usize> = HashSet::new();
-        for state in self.states.iter() {
-            if num_state.contains(state) {
-                return Err(format!("State {} exists twice", state));
-            }
-            num_state.insert(*state);
-        }
-
-        Ok(())
-    }
-
-    fn accept(&self, input: &str) -> bool {
-        let mut current = self.q_start;
-        'main: loop {
-            for c in input.chars() {
-                if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
-                    current = *next;
-                    continue;
-                }
-                break 'main false;
-            }
-            break self.q_accepting.contains(&current);
-        }
-    }
-}
-
-impl Debug for Dfa {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Dfa {{")?;
-        writeln!(f, "\tQ: {:?},", self.states)?;
-
-        let mut transitions: Vec<_> = self.transitions.iter().collect();
-        transitions.sort_by_key(|t| &t.0.0);
-        writeln!(f, "\td: {{")?;
-        for t in transitions {
-            writeln!(f, "\t\t{:?},", t)?;
-        }
-        writeln!(f, "\t}}")?;
-        writeln!(f, "\tq_0: {:?},", self.q_start)?;
-        writeln!(f, "\tF: {:?},", self.q_accepting)?;
-        write!(f, "}}")
-    }
-}
-
-///////////////////////////////////////////////////// HELPER TYPES ////////////////////////////////////////////////////
-
-// I don't plan on threading this (yet) so for now it's fine
-thread_local! {
-    static STATE_GEN: RefCell<usize> = RefCell::new(0);
-}
-
-fn next_state() -> usize {
-    STATE_GEN.with(|g| {
-        let mut cell = g.borrow_mut();
-        let next = *cell;
-        *cell += 1;
-        next
-    })
-}
-
-fn next_states(n: usize) -> Vec<usize> {
-    let range = STATE_GEN.with(|g| {
-        let mut cell = g.borrow_mut();
-        let first = *cell;
-        *cell += n;
-        // both bounds are inclusive
-        (first, *cell - 1)
-    });
-    vec![range.0, range.1]
-}
-
-/// only for testing purposes
-pub fn reset_state_counter() {
-    STATE_GEN.with(|g| {
-        let mut cell = g.borrow_mut();
-        *cell = 0usize;
-    })
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Symbol {
-    CHAR(char),
-    EPSILON,
-    // EVERYTHING, // used later on for the everything matcher .
-    EMPTY, // the empty language -> not sure if I actually need it. If not: todo rework this enum to an Optional
-}
-
-impl Display for Symbol {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Symbol::CHAR(c) => f.write_char(*c),
-            Symbol::EPSILON => f.write_str(""),
-            Symbol::EMPTY => f.write_str(""),
-        }
-    }
-}

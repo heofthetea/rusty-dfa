@@ -1,9 +1,13 @@
 # Rusty DFA
-Regular Expression Engine using DFA construction, written in Rust.
+Regular Expression Engine based on Powerset DFA construction, written in Rust.
+The goal is to create a somewhat-useful (however not perl-compatible) engine that can find patterns in strings and supports
+most syntactic features. Depending on my time and motivation I may try to improve this to be faster than grep (which is unrealistic tho).
 
-> This is, primarily, another step in my journey to desperately learn Rust for my Studienarbeit lol
-
-[//]: # (<br>The DFA is constructed via [powerset construction]&#40;https://en.wikipedia.org/wiki/Powerset_construction&#41; from an appropriate NFA.)
+## Features
+- [x] Accepting a language described by a regular expression
+- [x] Determining whether any substring of a word matches `pattern`
+- [ ] (in development) Locating a match of `pattern` within a string
+- [ ] Locating the longest left-most substring matching `pattern` (i.e. greediness)
 
 ## Supported Syntax
 This will never be a fully perl-comatible expression engine, for the very simple reason that it uses a DFA and thus cannot possibly
@@ -47,6 +51,8 @@ When finding patterns in a string, an unknown symbol simply means the run is res
 
 ## Future Scope
 I may try my hands at a [Thompson NFA](https://swtch.com/~rsc/regexp/regexp1.html) at some point, to see how my approach stacks up.
+Also I may implement a "parallel NFA" (i.e. a non-backtracking approach to simulating runs on NFAs) to see whether that may actually 
+be faster than the DFA construction.
 
 ### Performance
 One of my goals for this project is to make it as fast as possible (at the very least the actual matching, the construction is fine if it's a bit slower).

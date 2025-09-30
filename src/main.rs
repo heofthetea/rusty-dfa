@@ -1,5 +1,5 @@
 
-use crate::automata::{Automaton, Dfa};
+use crate::automata::dfa::Dfa;
 use crate::parse::parse;
 
 mod automata;

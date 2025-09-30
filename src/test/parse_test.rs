@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test_parse {
-    use crate::automata::{Automaton, Nfa, reset_state_counter};
+    use crate::automata::automaton::{reset_state_counter, Automaton};
     use crate::parse::parse;
 
     #[test]

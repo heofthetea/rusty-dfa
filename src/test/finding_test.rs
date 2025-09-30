@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 pub mod test_for_finding {
-    use crate::automata::{Automaton, Dfa};
+    use crate::automata::dfa::Dfa;
     use crate::parse::{parse};
 
     #[test]

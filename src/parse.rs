@@ -1,4 +1,5 @@
-use crate::automata::{Automaton, Nfa, Symbol};
+use crate::automata::automaton::Symbol;
+use crate::automata::nfa::Nfa;
 
 /// Parse `pattern` into a Non-deterministic Finite Automaton.
 ///

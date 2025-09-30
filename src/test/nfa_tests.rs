@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod test_nfa_construction {
-    use crate::automata::{Automaton, Nfa, Symbol};
     use std::collections::HashSet;
+    use crate::automata::automaton::{Symbol, Automaton};
+    use crate::automata::nfa::Nfa;
 
     /// GIVEN: A valid NFA with 3 states, alphabet {a, b}, and transitions that accept strings containing 'a'
     /// WHEN: Constructing the NFA with valid parameters
@@ -144,7 +145,8 @@ mod test_nfa_construction {
 
 #[cfg(test)]
 mod test_nfa_combinations {
-    use crate::automata::{Automaton, Nfa, Symbol, reset_state_counter};
+    use crate::automata::nfa::Nfa;
+    use crate::automata::automaton::{reset_state_counter, Automaton, Symbol};
 
     /// GIVEN: An NFA left accepting the language {"a"}
     /// GIVEN: An NFA right accepting the language {"b"}
@@ -208,7 +210,8 @@ mod test_nfa_combinations {
 #[cfg(test)]
 mod test_nfa_to_dfa {
     use std::collections::HashSet;
-    use crate::automata::{Nfa, Symbol};
+    use crate::automata::automaton::Symbol;
+    use crate::automata::nfa::Nfa;
 
     /// GIVEN: An NFA with cyclical epsilon transitions
     /// WHEN: ec(0) is calculated
@@ -244,7 +247,7 @@ mod test_nfa_to_dfa {
 
 #[cfg(test)]
 mod test_reverse {
-    use crate::automata::Automaton;
+    use crate::automata::automaton::Automaton;
     use crate::parse::parse;
 
     #[test]
