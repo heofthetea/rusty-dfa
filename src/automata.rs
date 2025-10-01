@@ -423,31 +423,42 @@ impl Dfa {
     }
 
     /// non-greedy currently
-    fn _find(&self, input: &str) -> Option<(usize, usize)> {
+    /// `greedy_naive` only lets the DFA continue after reaching an accepting state
+    /// in hopes of finding another one
+    /// In a finding DFA this approach trivially doesn't work
+    fn _find(&self, input: &str, greedy_naive: bool) -> Option<(usize, usize)> {
         let mut current = self.q_start;
         let mut start: usize = 0; // not the actual start of the match - just a lower bound
+        let mut best_end: Option<usize> = None;
         for (pos, c) in input.chars().enumerate() {
             if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
                 current = *next;
                 if self.q_accepting.contains(&current) {
-                    return Some((start, pos));
+                    if !greedy_naive {
+                        return Some((start, pos));
+                    }
+                    // no need to compare because it's guaranteed this best is better than the previous
+                    best_end = Some(pos);
                 }
                 continue;
             }
             current = self.q_start;
             start = 0;
         }
-        None
+        if let Some(end) = best_end {
+            Some((start, end))
+        } else {
+            None
+        }
     }
 
     pub fn find(&self, input: &str, reversed: &Dfa) -> Option<(usize, usize)> {
-        if let Some((_, end)) = self._find(input) {
+        if let Some((_, end)) = self._find(input, false) {
             let reversed_input: String = input.chars().rev().collect();
             let rev_end = input.len() - end - 1;
             // should always find a match because of reversal
-            let (_, start) = reversed._find(&reversed_input[rev_end..]).unwrap();
-            return Some((&reversed_input[rev_end..].len() - start - 1, end))
-
+            let (_, start) = reversed._find(&reversed_input[rev_end..], true).unwrap();
+            return Some((&reversed_input[rev_end..].len() - start - 1, end));
         }
         None
     }

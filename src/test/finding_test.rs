@@ -62,8 +62,7 @@ pub mod test_for_finding {
         assert!(dfa.find("cab", &dfa_reverse).is_none());
 
     }
-
-    // if this doesn't kill me I'll kiss the rust crab
+    
     #[test]
     fn test_klenee_aka_im_dead() {
         let pattern = "a*b";
