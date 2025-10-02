@@ -3,7 +3,7 @@
 /// So those tests are going to have a bit more logic.
 
 #[cfg(test)]
-pub mod test_for_finding {
+pub mod test_finding {
     use crate::automata::{Automaton, Dfa};
     use crate::parse::{parse};
 
@@ -113,5 +113,48 @@ pub mod test_for_finding {
         assert!(dfa.find("b", &dfa_reverse).is_none());
         assert!(dfa.find("ab", &dfa_reverse).is_none());
         assert!(dfa.find("ba", &dfa_reverse).is_none());
+    }
+
+
+    #[test]
+    fn test_absurd_case_lol() {
+        let pattern =  "a?b+(a|c)?|c+";
+        let mut nfa = parse(&pattern);
+        let dfa_reversed = Dfa::from(&nfa.reversed());
+        nfa.to_finding();
+        let dfa = Dfa::from(&nfa);
+
+        // println!("{:?}", dfa);
+        println!("{:?}", dfa_reversed);
+        assert_eq!(dfa.find("aab", &dfa_reversed).unwrap(), (1, 2));
+        assert_eq!(dfa.find("aabbaa", &dfa_reversed).unwrap(), (1, 4));
+        assert_eq!(dfa.find("cccba", &dfa_reversed).unwrap(), (0, 2));
+        // assert_eq!(dfa.find("c", &dfa_reversed).unwrap(), (0, 0));
+        // assert_eq!(dfa.find("ccccc", &dfa_reversed).unwrap(), (0, 0));
+        // assert_eq!(dfa.find("bc", &dfa_reversed).unwrap(), (0, 0));
+    }
+}
+
+#[cfg(test)]
+pub mod test_make_matches {
+    use crate::automata::make_matches;
+
+    #[test]
+    fn test_my_paper_example() {
+        let starts: Vec<usize> = vec![1, 2, 4, 6, 9];
+        let ends: Vec<usize> = vec![3, 7, 8, 11];
+        assert_eq!(make_matches(&starts, &ends), vec![(1, 3), (4, 8), (9, 11)]);
+    }
+    #[test]
+    fn test_end_equal_start() {
+        let starts: Vec<usize> = vec![1, 4, 5];
+        let ends: Vec<usize> = vec![3, 4, 7];
+        assert_eq!(make_matches(&starts, &ends), vec![(1, 4), (5, 7)]);
+    }
+    #[test]
+    fn test_klenee_like() {
+        let starts: Vec<usize> = vec![3];
+        let ends: Vec<usize> = vec![6, 7, 8, 9, 10, 11];
+        assert_eq!(make_matches(&starts, &ends), vec![(3, 11)]);
     }
 }

@@ -244,7 +244,7 @@ mod test_nfa_to_dfa {
 
 #[cfg(test)]
 mod test_reverse {
-    use crate::automata::Automaton;
+    use crate::automata::{Automaton, Dfa};
     use crate::parse::parse;
 
     #[test]
@@ -313,5 +313,20 @@ mod test_reverse {
         assert!(!reversed.accept("bcbaa"));
         assert!(!reversed.accept("ada"));
         assert!(!reversed.accept("ada"));
+        
+        let dfa = Dfa::from(&reversed);
+        assert!(dfa.accept(""));
+        assert!(dfa.accept("dcdc"));
+        assert!(dfa.accept("dcba"));
+        assert!(dfa.accept("babadc"));
+        assert!(dfa.accept("bcb"));
+        assert!(dfa.accept("bcba"));
+        assert!(dfa.accept("bda"));
+        assert!(dfa.accept("baaaaaaaaacb"));
+        assert!(dfa.accept("baaaaaaaaada"));
+        // not match
+        assert!(!dfa.accept("bcbaa"));
+        assert!(!dfa.accept("ada"));
+        assert!(!dfa.accept("ada"));
     }
 }

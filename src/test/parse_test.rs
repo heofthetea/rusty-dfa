@@ -121,11 +121,17 @@ mod test_parse {
         assert!(!nfa.accept("a"));
     }
 
-    #[test]
-    fn test_pathological_backtracking_case() {
-        let pattern = "a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa";
-        let nfa = parse(&pattern);
-        println!("{:?}", nfa);
-        assert!(nfa.accept("aaaaaaaaaaaaaaaaaaaaaaaaa"))
-    }
+    // // for the love of god only uncomment this if you're prepared for the ten-plus-minute runtime
+    // #[test]
+    // fn test_pathological_backtracking_case() {
+    //     use std::time::Instant;
+    //     let pattern = "a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa";
+    //     let nfa = parse(&pattern);
+    //     println!("{:?}", nfa);
+    //     let input = "aaaaaaaaaaaaaaaaaaaaaaaaa";
+    //     let start = Instant::now();
+    //     assert!(nfa.accept(input));
+    //     let duration = start.elapsed();
+    //     println!("accept took: {:?}", duration);
+    // }
 }

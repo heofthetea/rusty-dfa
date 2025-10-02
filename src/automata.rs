@@ -1,8 +1,10 @@
 use crate::automata::Symbol::CHAR;
 use bimap::BiMap;
+use std::any::type_name;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter, Write};
+use std::thread::current;
 
 pub trait Automaton {
     /// Validate the `Automaton`
@@ -422,45 +424,49 @@ impl Dfa {
         dfa
     }
 
-    /// non-greedy currently
-    /// `greedy_naive` only lets the DFA continue after reaching an accepting state
-    /// in hopes of finding another one
-    /// In a finding DFA this approach trivially doesn't work
-    fn _find(&self, input: &str, greedy_naive: bool) -> Option<(usize, usize)> {
+    /// Find all characters at which the Dfa is in an accepting state
+    fn _find_ends(&self, input: &str) -> Vec<usize> {
         let mut current = self.q_start;
-        let mut start: usize = 0; // not the actual start of the match - just a lower bound
-        let mut best_end: Option<usize> = None;
+        let mut ends: Vec<usize> = Vec::new();
         for (pos, c) in input.chars().enumerate() {
             if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
                 current = *next;
                 if self.q_accepting.contains(&current) {
-                    if !greedy_naive {
-                        return Some((start, pos));
-                    }
-                    // no need to compare because it's guaranteed this best is better than the previous
-                    best_end = Some(pos);
+                    ends.push(pos);
                 }
                 continue;
             }
             current = self.q_start;
-            start = 0;
         }
-        if let Some(end) = best_end {
-            Some((start, end))
-        } else {
-            None
+        ends
+    }
+
+    pub fn find_all(&self, input: &str, reversed: &Dfa) -> Option<Vec<(usize, usize)>> {
+        let ends = self._find_ends(input);
+        if ends.is_empty() {
+            return None;
         }
+        let reversed_input: String = input.chars().rev().collect();
+        let rev_end = input.len() - ends.last().unwrap() - 1;
+        let starts = reversed
+            ._find_ends(&reversed_input[rev_end..]);
+        // ensure reverse search is started at the end of the last match
+        let starts: Vec<usize> = starts
+            .iter()
+            .map(|x| input.len() - x - 1 - rev_end)
+            .rev()
+            .collect();
+        println!("ends: {:?}\nstarts: {:?}", ends, starts);
+        Some(make_matches(&starts, &ends))
     }
 
     pub fn find(&self, input: &str, reversed: &Dfa) -> Option<(usize, usize)> {
-        if let Some((_, end)) = self._find(input, false) {
-            let reversed_input: String = input.chars().rev().collect();
-            let rev_end = input.len() - end - 1;
-            // should always find a match because of reversal
-            let (_, start) = reversed._find(&reversed_input[rev_end..], true).unwrap();
-            return Some((&reversed_input[rev_end..].len() - start - 1, end));
+        if let Some(matches) = self.find_all(input, reversed) {
+            println!("{:?}", matches);
+            matches.first().cloned()
+        } else {
+            None
         }
-        None
     }
 
     // may not actually be needed we'll see
@@ -586,4 +592,82 @@ impl Display for Symbol {
             Symbol::EMPTY => f.write_str(""),
         }
     }
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Turn a list of ordered `starts` \[of a match] and `ends` into a list of matches.
+/// The matches are constructed greedily; starting with the left-most start, this function searches
+/// for the right-most end before another start is encountered.
+/// Tbh: I absolutely cannot explain wtf I did here. It may work, it may not. Idk. It also took me way too long
+pub fn make_matches(starts: &Vec<usize>, ends: &Vec<usize>) -> Vec<(usize, usize)> {
+    let merged = _merge_anchors(starts, ends);
+    println!("merged: {:?}", merged);
+    let mut matches: Vec<(usize, usize)> = Vec::new();
+
+    let mut i: usize = 0;
+    while let Some((index, l)) = merged.get(i) {
+        let start = *index;
+        let best_end_index = loop {
+            // iterate over all following starts
+            while let Some((_, l)) = merged.get(i) {
+                match l {
+                    Location::START => i += 1,
+                    Location::END => break,
+                }
+            }
+            // iterate over all following ends
+            while let Some((_, l)) = merged.get(i) {
+                match l {
+                    Location::START => break,
+                    Location::END => i += 1,
+                }
+            }
+            // return the index of the last encountered end
+            break i - 1;
+        };
+        if let Some((end, _)) = merged.get(best_end_index) {
+            matches.push((start, *end));
+        }
+    }
+    matches
+}
+
+#[derive(Debug)]
+enum Location {
+    START,
+    END,
+}
+
+/// two-way merge akin to a merge sort, except we preserve information about which list the element came from
+fn _merge_anchors(starts: &Vec<usize>, ends: &Vec<usize>) -> Vec<(usize, Location)> {
+    let mut start: usize = 0;
+    let mut end: usize = 0;
+    let mut out: Vec<(usize, Location)> = Vec::new();
+
+    loop {
+        match (starts.get(start), ends.get(end)) {
+            (None, None) => break,
+            (Some(_), None) => {
+                out.extend(starts.iter().skip(start).map(|s| (*s, Location::START)));
+                break;
+            }
+            (None, Some(_)) => {
+                out.extend(ends.iter().skip(end).map(|e| (*e, Location::END)));
+                break;
+            }
+            (Some(&current_start), Some(&current_end)) => {
+                if current_end == current_start {
+                    start += 1;
+                }
+                if current_start < current_end {
+                    out.push((current_start, Location::START));
+                    start += 1;
+                } else {
+                    out.push((current_end, Location::END));
+                    end += 1;
+                }
+            }
+        }
+    }
+    out
 }
