@@ -120,41 +120,30 @@ pub mod test_finding {
     fn test_absurd_case_lol() {
         let pattern =  "a?b+(a|c)?|c+";
         let mut nfa = parse(&pattern);
+        assert_eq!(nfa.find("aab").unwrap(), (1, 2));
+        assert_eq!(nfa.find("aabbaa").unwrap(), (1, 4));
+        assert_eq!(nfa.find("cccba").unwrap(), (0, 2));
+        assert_eq!(nfa.find("acba").unwrap(), (1, 1));
+        assert_eq!(nfa.find("bbbccc").unwrap(), (0, 3));
+        assert_eq!(nfa.find("the bbc is the british broadcasting network").unwrap(), (4, 6));
+        // no match
+        assert!(nfa.find("aa").is_none());
+        assert!(nfa.find("dfekjoei").is_none());
+
+
         let dfa_reversed = Dfa::from(&nfa.reversed());
         nfa.to_finding();
         let dfa = Dfa::from(&nfa);
 
         // println!("{:?}", dfa);
-        println!("{:?}", dfa_reversed);
         assert_eq!(dfa.find("aab", &dfa_reversed).unwrap(), (1, 2));
         assert_eq!(dfa.find("aabbaa", &dfa_reversed).unwrap(), (1, 4));
         assert_eq!(dfa.find("cccba", &dfa_reversed).unwrap(), (0, 2));
-        // assert_eq!(dfa.find("c", &dfa_reversed).unwrap(), (0, 0));
-        // assert_eq!(dfa.find("ccccc", &dfa_reversed).unwrap(), (0, 0));
-        // assert_eq!(dfa.find("bc", &dfa_reversed).unwrap(), (0, 0));
-    }
-}
-
-#[cfg(test)]
-pub mod test_make_matches {
-    use crate::automata::make_matches;
-
-    #[test]
-    fn test_my_paper_example() {
-        let starts: Vec<usize> = vec![1, 2, 4, 6, 9];
-        let ends: Vec<usize> = vec![3, 7, 8, 11];
-        assert_eq!(make_matches(&starts, &ends), vec![(1, 3), (4, 8), (9, 11)]);
-    }
-    #[test]
-    fn test_end_equal_start() {
-        let starts: Vec<usize> = vec![1, 4, 5];
-        let ends: Vec<usize> = vec![3, 4, 7];
-        assert_eq!(make_matches(&starts, &ends), vec![(1, 4), (5, 7)]);
-    }
-    #[test]
-    fn test_klenee_like() {
-        let starts: Vec<usize> = vec![3];
-        let ends: Vec<usize> = vec![6, 7, 8, 9, 10, 11];
-        assert_eq!(make_matches(&starts, &ends), vec![(3, 11)]);
+        assert_eq!(dfa.find("acba", &dfa_reversed).unwrap(), (1, 1));
+        assert_eq!(dfa.find("bbbccc", &dfa_reversed).unwrap(), (0, 3));
+        assert_eq!(dfa.find("the bbc is the british broadcasting network", &dfa_reversed).unwrap(), (4, 6));
+        // no match
+        assert!(dfa.find("aa", &dfa_reversed).is_none());
+        assert!(dfa.find("dfekjoei", &dfa_reversed).is_none());
     }
 }

@@ -101,23 +101,42 @@ impl Nfa {
 
     pub fn find(&self, input: &str) -> Option<(usize, usize)> {
         for (id, c) in input.chars().enumerate() {
-            if let Some(end) = self._accept(self.q_start, &input[id..], id, false) {
+            let mut best_end: Option<usize> = None;
+            self._accept(self.q_start, &input[id..], id, &mut best_end, false);
+            if let Some(end) = best_end {
                 return Some((id, end));
             }
         }
         None
     }
 
-    fn _accept(&self, state: usize, word: &str, depth: usize, full_accept: bool) -> Option<usize> {
+    /// Backtracking implementation for finding a greedy match of the pattern represented by `self` in `word`
+    /// The index of the character at which the longest match ends is stored in `last_accepted` (`None` if no match)
+    /// Probably the worst code you'll ever see, I'm surprised it hasn't panicked on me yet
+    fn _accept(
+        &self,
+        state: usize,
+        word: &str,
+        depth: usize,
+        last_accepted: &mut Option<usize>,
+        full_accept: bool,
+    ) {
         if word.is_empty() || !full_accept {
             let ec = self.ec(state);
             if ec.iter().find(|q| self.q_accepting.contains(q)).is_some() {
                 // if q_0 accepts we won't do a recursive loop and thus
                 // won't have added anything to the depth
                 if depth == 0 {
-                    return Some(depth);
+                    *last_accepted = Some(depth);
                 }
-                return Some(depth - 1); // undo last addition
+                // ah yes options how pretty
+                if let Some(best_end) = last_accepted {
+                    if depth - 1 > *best_end {
+                        *last_accepted = Some(depth - 1); // undo last addition
+                    }
+                } else {
+                    *last_accepted = Some(depth - 1);
+                }
             }
         }
         if let Some(c) = word.chars().nth(0) {
@@ -126,18 +145,15 @@ impl Nfa {
                     CHAR(_) => 1,
                     Symbol::EPSILON | Symbol::EMPTY => 0,
                 };
-                let end = self._accept(
+                self._accept(
                     transition.2,
                     &word[consumed..],
                     depth + consumed,
+                    last_accepted,
                     full_accept,
                 );
-                if end.is_some() {
-                    return end;
-                }
             }
         }
-        None
     }
 
     /////////////////////////////////////////////// CONSTRUCTION METHODS ///////////////////////////////////////////////
@@ -334,7 +350,9 @@ impl Automaton for Nfa {
     /// WARNING: this will cause infinite recursion on epsilon cycles lol
     /// Maybe I can fix that by using epsilon closures instead of raw transitions...
     fn accept(&self, word: &str) -> bool {
-        self._accept(self.q_start, word, 0, true).is_some()
+        let mut best_end = None;
+        self._accept(self.q_start, word, 0, &mut best_end, true);
+        best_end.is_some()
     }
 }
 
@@ -425,7 +443,7 @@ impl Dfa {
     }
 
     /// Find all characters at which the Dfa is in an accepting state
-    fn _find_ends(&self, input: &str) -> Vec<usize> {
+    fn _find_ends(&self, input: &str, allow_resets: bool) -> Vec<usize> {
         let mut current = self.q_start;
         let mut ends: Vec<usize> = Vec::new();
         for (pos, c) in input.chars().enumerate() {
@@ -436,33 +454,42 @@ impl Dfa {
                 }
                 continue;
             }
+            if !allow_resets {
+                break;
+            }
             current = self.q_start;
         }
         ends
     }
 
+    /// Find all matches of the pattern represented by `self` in `input`.
+    /// Returns an ordered vector of tuples `(start, end)`, where each tuple represents an individual match.
+    /// The matches are greedy.
     pub fn find_all(&self, input: &str, reversed: &Dfa) -> Option<Vec<(usize, usize)>> {
-        let ends = self._find_ends(input);
+        let ends = self._find_ends(input, true);
         if ends.is_empty() {
             return None;
         }
         let reversed_input: String = input.chars().rev().collect();
-        let rev_end = input.len() - ends.last().unwrap() - 1;
-        let starts = reversed
-            ._find_ends(&reversed_input[rev_end..]);
-        // ensure reverse search is started at the end of the last match
-        let starts: Vec<usize> = starts
-            .iter()
-            .map(|x| input.len() - x - 1 - rev_end)
-            .rev()
-            .collect();
-        println!("ends: {:?}\nstarts: {:?}", ends, starts);
-        Some(make_matches(&starts, &ends))
+        let mut potential_matches: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for end in ends {
+            let rev_end = input.len() - end - 1;
+            potential_matches.insert(
+                end,
+                reversed
+                    ._find_ends(&reversed_input[rev_end..], false)
+                    .iter()
+                    .map(|x| input.len() - x - 1 - rev_end)
+                    .rev()
+                    .collect(),
+            );
+        }
+        Some(consolidate(&potential_matches))
     }
 
+    /// Find the first match of the pattern represented by `self` in `input`.
     pub fn find(&self, input: &str, reversed: &Dfa) -> Option<(usize, usize)> {
         if let Some(matches) = self.find_all(input, reversed) {
-            println!("{:?}", matches);
             matches.first().cloned()
         } else {
             None
@@ -595,79 +622,18 @@ impl Display for Symbol {
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Turn a list of ordered `starts` \[of a match] and `ends` into a list of matches.
-/// The matches are constructed greedily; starting with the left-most start, this function searches
-/// for the right-most end before another start is encountered.
-/// Tbh: I absolutely cannot explain wtf I did here. It may work, it may not. Idk. It also took me way too long
-pub fn make_matches(starts: &Vec<usize>, ends: &Vec<usize>) -> Vec<(usize, usize)> {
-    let merged = _merge_anchors(starts, ends);
-    println!("merged: {:?}", merged);
-    let mut matches: Vec<(usize, usize)> = Vec::new();
-
-    let mut i: usize = 0;
-    while let Some((index, l)) = merged.get(i) {
-        let start = *index;
-        let best_end_index = loop {
-            // iterate over all following starts
-            while let Some((_, l)) = merged.get(i) {
-                match l {
-                    Location::START => i += 1,
-                    Location::END => break,
-                }
-            }
-            // iterate over all following ends
-            while let Some((_, l)) = merged.get(i) {
-                match l {
-                    Location::START => break,
-                    Location::END => i += 1,
-                }
-            }
-            // return the index of the last encountered end
-            break i - 1;
-        };
-        if let Some((end, _)) = merged.get(best_end_index) {
-            matches.push((start, *end));
-        }
+/// Consolidate a set of potential matches to greedy matches.
+/// idfk how else I should explain this
+pub fn consolidate(ends_to_starts: &BTreeMap<usize, Vec<usize>>) -> Vec<(usize, usize)> {
+    let mut starts_to_ends: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
+    for (end, starts) in ends_to_starts {
+        starts_to_ends
+            .entry(*starts.first().unwrap())
+            .or_default()
+            .insert(*end);
     }
-    matches
-}
-
-#[derive(Debug)]
-enum Location {
-    START,
-    END,
-}
-
-/// two-way merge akin to a merge sort, except we preserve information about which list the element came from
-fn _merge_anchors(starts: &Vec<usize>, ends: &Vec<usize>) -> Vec<(usize, Location)> {
-    let mut start: usize = 0;
-    let mut end: usize = 0;
-    let mut out: Vec<(usize, Location)> = Vec::new();
-
-    loop {
-        match (starts.get(start), ends.get(end)) {
-            (None, None) => break,
-            (Some(_), None) => {
-                out.extend(starts.iter().skip(start).map(|s| (*s, Location::START)));
-                break;
-            }
-            (None, Some(_)) => {
-                out.extend(ends.iter().skip(end).map(|e| (*e, Location::END)));
-                break;
-            }
-            (Some(&current_start), Some(&current_end)) => {
-                if current_end == current_start {
-                    start += 1;
-                }
-                if current_start < current_end {
-                    out.push((current_start, Location::START));
-                    start += 1;
-                } else {
-                    out.push((current_end, Location::END));
-                    end += 1;
-                }
-            }
-        }
-    }
-    out
+    starts_to_ends
+        .iter()
+        .map(|(start, ends)| (*start, *ends.last().unwrap()))
+        .collect()
 }
