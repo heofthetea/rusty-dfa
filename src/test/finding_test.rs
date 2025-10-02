@@ -85,6 +85,28 @@ pub mod test_finding {
         assert!(dfa.find("a", &dfa_reverse).is_none());
         assert!(dfa.find("", &dfa_reverse).is_none());
     }
+    #[test]
+    fn test_klenee_aka_im_dead_2() {
+        let pattern = "ba*";
+        let mut nfa = parse(pattern);
+        println!("{:?}", &nfa);
+        assert_eq!(nfa.find("b").unwrap(), (0, 0));
+        assert_eq!(nfa.find("ba").unwrap(), (0, 1));
+        assert_eq!(nfa.find("baaaaa").unwrap(), (0, 5));
+        assert!(nfa.find("a").is_none());
+        assert!(nfa.find("").is_none());
+
+        let reversed = nfa.reversed();
+        nfa.to_finding();
+        let dfa = Dfa::from(&nfa);
+        let dfa_reverse = Dfa::from(&reversed);
+        println!("{:?}", &dfa);
+        assert_eq!(dfa.find("b", &dfa_reverse).unwrap(), (0, 0));
+        assert_eq!(dfa.find("ba", &dfa_reverse).unwrap(), (0, 1));
+        assert_eq!(dfa.find("baaaaa", &dfa_reverse).unwrap(), (0, 5));
+        assert!(dfa.find("a", &dfa_reverse).is_none());
+        assert!(dfa.find("", &dfa_reverse).is_none());
+    }
 
     #[test]
     fn test_klenee_in_the_middle() {

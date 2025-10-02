@@ -464,7 +464,14 @@ impl Dfa {
 
     /// Find all matches of the pattern represented by `self` in `input`.
     /// Returns an ordered vector of tuples `(start, end)`, where each tuple represents an individual match.
-    /// The matches are greedy.
+    /// Greediness of the matches is achieved by
+    /// 1. collecting all possible ends of a match,
+    /// 2. Running the `reversed` version of the DFA on the reversed input for each of these ends (see https://swtch.com/~rsc/regexp/regexp3.html#submatch)
+    ///     to find the possibile starts for each match
+    /// 3. Consolidating this mapping of `end -> possible starts` to only pick the earliest start possible for every `end`.
+    ///     By using a hash map for this, different ends that have the same earliest start are consolidated as well, to choose the latest end.
+    ///
+    /// Don't ask me why this works I'm not even 100% certain that it does at all
     pub fn find_all(&self, input: &str, reversed: &Dfa) -> Option<Vec<(usize, usize)>> {
         let ends = self._find_ends(input, true);
         if ends.is_empty() {
@@ -484,6 +491,7 @@ impl Dfa {
                     .collect(),
             );
         }
+        // println!("potential: {:?}", consolidate(&potential_matches));
         Some(consolidate(&potential_matches))
     }
 
