@@ -1,5 +1,6 @@
 
 use crate::automata::{Automaton, Dfa};
+use crate::benchmark::benchmark_dfa::benchmark_dfa_klenee;
 use crate::parse::parse;
 
 mod automata;
@@ -7,13 +8,9 @@ mod parse;
 
 #[cfg(test)]
 mod test;
+mod benchmark;
 
 fn main() {
-    let pattern = "a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaa";
-    let pattern = "a?a?aa";
-    let nfa = parse(&pattern);
-    println!("{:?}", &nfa);
-    let dfa = Dfa::from(&nfa);
-    println!("{:?}", &dfa)
+    benchmark_dfa_klenee(100000, 1000);
 
 }

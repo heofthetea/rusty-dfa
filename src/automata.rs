@@ -5,6 +5,17 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::thread::current;
+use crate::parse::parse;
+
+pub fn find_all_with_dfa_i_hate_my_life(pattern: &str, input: &str) -> Option<Vec<(usize, usize)>> {
+    let input_reversed: String = input.chars().rev().collect();
+
+    let nfa = parse(&pattern);
+
+    let dfa_reversed = Dfa::from(&nfa.reversed().to_finding());
+    let dfa = Dfa::from(&nfa);
+    dfa_reversed.find_all(&input_reversed, &dfa)
+}
 
 pub trait Automaton {
     /// Validate the `Automaton`
@@ -22,6 +33,7 @@ pub trait Automaton {
     // fn find(&self, input: &str) -> Option<(usize, usize)>;
 }
 
+#[derive(Clone)]
 pub struct Nfa {
     pub states: Vec<usize>,
     pub transitions: HashSet<(usize, Symbol, usize)>,
@@ -209,11 +221,13 @@ impl Nfa {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    pub fn to_finding(&mut self) {
-        for state in &self.states {
-            self.transitions
+    pub fn to_finding(&self) -> Nfa{
+        let mut nfa = self.clone();
+        for state in &nfa.states {
+            nfa.transitions
                 .insert((*state, Symbol::EPSILON, self.q_start));
         }
+        nfa
     }
 
     /// Reverse an `Nfa`.
@@ -464,35 +478,71 @@ impl Dfa {
 
     /// Find all matches of the pattern represented by `self` in `input`.
     /// Returns an ordered vector of tuples `(start, end)`, where each tuple represents an individual match.
-    /// Greediness of the matches is achieved by
-    /// 1. collecting all possible ends of a match,
-    /// 2. Running the `reversed` version of the DFA on the reversed input for each of these ends (see https://swtch.com/~rsc/regexp/regexp3.html#submatch)
-    ///     to find the possibile starts for each match
-    /// 3. Consolidating this mapping of `end -> possible starts` to only pick the earliest start possible for every `end`.
-    ///     By using a hash map for this, different ends that have the same earliest start are consolidated as well, to choose the latest end.
-    ///
-    /// Don't ask me why this works I'm not even 100% certain that it does at all
+    /// Why am I using an ASM for this
     pub fn find_all(&self, input: &str, reversed: &Dfa) -> Option<Vec<(usize, usize)>> {
         let ends = self._find_ends(input, true);
         if ends.is_empty() {
             return None;
         }
-        let reversed_input: String = input.chars().rev().collect();
-        let mut potential_matches: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-        for end in ends {
-            let rev_end = input.len() - end - 1;
-            potential_matches.insert(
-                end,
-                reversed
-                    ._find_ends(&reversed_input[rev_end..], false)
-                    .iter()
-                    .map(|x| input.len() - x - 1 - rev_end)
-                    .rev()
-                    .collect(),
-            );
+        let ends_in_reverse: Vec<usize> = ends.iter().map(|pos| input.len() - *pos - 1).collect();
+        let mut ends_in_reverse = ends_in_reverse.iter().rev().peekable();
+        // let reversed_input: String = input.chars().rev().collect();
+
+        // variables for matching automaton
+        let mut current = self.q_start;
+        let mut step_bro_im_stuck = false;
+
+        // variables for greediness automaton
+        enum State {
+            END,
+            START,
         }
-        // println!("potential: {:?}", consolidate(&potential_matches));
-        Some(consolidate(&potential_matches))
+        let mut state = State::END;
+        let mut current_end: Option<usize> = ends_in_reverse.peek().cloned().cloned();
+        let mut pairs: Vec<(usize, usize)> = Vec::new();
+        let mut best_start: Option<usize> = None;
+        for (pos, c) in input.chars().rev().enumerate() {
+            let is_end =
+                { ends_in_reverse.peek() == Some(&&pos) && ends_in_reverse.next() == Some(&pos) };
+            if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
+                current = *next;
+            } else {
+                step_bro_im_stuck = true;
+            }
+            // note: already moved to the next dfa state here
+
+            let transition_condition = (&state, self.q_accepting.contains(&current), is_end);
+            match transition_condition {
+                (State::END, false, false) => {}
+                (State::END, false, true) => {if current_end.is_none() {current_end = Some(pos)}}
+                (State::END, true, false) => {
+                    state = State::START;
+                    best_start = Some(pos)
+                }
+                (State::END, true, true) => {
+                    pairs.push((current_end.unwrap(), best_start.unwrap_or(pos)));
+                    current_end = None;
+                    current = self.q_start;
+                }
+                (State::START, _, false) => {
+                    if !step_bro_im_stuck {
+                        best_start = Some(pos)
+                    }
+                }
+                (State::START, _, true) => {
+                    pairs.push((current_end.unwrap(), best_start.unwrap()));
+                    current_end = Some(pos);
+                    current = self.q_start;
+                    state = State::END;
+                }
+            }
+        }
+        // pairs.push((current_end?, best_start?));
+        if let Some(end) = current_end && let Some(start) = best_start {
+            pairs.push((end, start));
+        }
+
+        Some(pairs)
     }
 
     /// Find the first match of the pattern represented by `self` in `input`.
