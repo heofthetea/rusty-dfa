@@ -7,15 +7,6 @@ use std::fmt::{Debug, Display, Formatter, Write};
 use std::thread::current;
 use crate::parse::parse;
 
-pub fn find_all_with_dfa_i_hate_my_life(pattern: &str, input: &str) -> Option<Vec<(usize, usize)>> {
-    let input_reversed: String = input.chars().rev().collect();
-
-    let nfa = parse(&pattern);
-
-    let dfa_reversed = Dfa::from(&nfa.reversed().to_finding());
-    let dfa = Dfa::from(&nfa);
-    dfa_reversed.find_all(&input_reversed, &dfa)
-}
 
 pub trait Automaton {
     /// Validate the `Automaton`
@@ -480,16 +471,19 @@ impl Dfa {
     /// Returns an ordered vector of tuples `(start, end)`, where each tuple represents an individual match.
     /// Why am I using an ASM for this
     pub fn find_all(&self, input: &str, reversed: &Dfa) -> Option<Vec<(usize, usize)>> {
+        print!("{:?}", self);
+        println!("{:?}", reversed);
         let ends = self._find_ends(input, true);
         if ends.is_empty() {
             return None;
         }
-        let ends_in_reverse: Vec<usize> = ends.iter().map(|pos| input.len() - *pos - 1).collect();
+        // We need to ensure we start the reversed match on the exact character of the respective end
+        let cutoff = input.len() - ends.last().unwrap() - 1;
+        let ends_in_reverse: Vec<usize> = ends.iter().map(|pos| input.len() - *pos - 1 - cutoff).collect();
         let mut ends_in_reverse = ends_in_reverse.iter().rev().peekable();
-        // let reversed_input: String = input.chars().rev().collect();
 
         // variables for matching automaton
-        let mut current = self.q_start;
+        let mut current = reversed.q_start;
         let mut step_bro_im_stuck = false;
 
         // variables for greediness automaton
@@ -501,28 +495,26 @@ impl Dfa {
         let mut current_end: Option<usize> = ends_in_reverse.peek().cloned().cloned();
         let mut pairs: Vec<(usize, usize)> = Vec::new();
         let mut best_start: Option<usize> = None;
-        for (pos, c) in input.chars().rev().enumerate() {
+        // weird ahh double state machine
+        // while simulating a run of the reversed input on `reversed`, we also, constantly,
+        // run a second state machine (with side-effects) that tells us whether we need a
+        // starting position to create a match, or an end position to start a new one.
+        for (pos, c) in input.chars().rev().skip(cutoff).enumerate() {
             let is_end =
                 { ends_in_reverse.peek() == Some(&&pos) && ends_in_reverse.next() == Some(&pos) };
-            if let Some(next) = self.transitions.get(&(current, CHAR(c))) {
+            if let Some(next) = reversed.transitions.get(&(current, CHAR(c))) {
                 current = *next;
             } else {
                 step_bro_im_stuck = true;
             }
-            // note: already moved to the next dfa state here
 
-            let transition_condition = (&state, self.q_accepting.contains(&current), is_end);
+            let transition_condition = (&state, reversed.q_accepting.contains(&current), is_end);
             match transition_condition {
                 (State::END, false, false) => {}
                 (State::END, false, true) => {if current_end.is_none() {current_end = Some(pos)}}
-                (State::END, true, false) => {
+                (State::END, true, _) => {
                     state = State::START;
                     best_start = Some(pos)
-                }
-                (State::END, true, true) => {
-                    pairs.push((current_end.unwrap(), best_start.unwrap_or(pos)));
-                    current_end = None;
-                    current = self.q_start;
                 }
                 (State::START, _, false) => {
                     if !step_bro_im_stuck {
@@ -530,16 +522,16 @@ impl Dfa {
                     }
                 }
                 (State::START, _, true) => {
-                    pairs.push((current_end.unwrap(), best_start.unwrap()));
+                    pairs.push((current_end.unwrap() + cutoff, best_start.unwrap() + cutoff));
                     current_end = Some(pos);
-                    current = self.q_start;
+                    current = reversed.q_start;
                     state = State::END;
                 }
             }
         }
         // pairs.push((current_end?, best_start?));
         if let Some(end) = current_end && let Some(start) = best_start {
-            pairs.push((end, start));
+            pairs.push((end + cutoff, start + cutoff));
         }
 
         Some(pairs)
@@ -660,6 +652,9 @@ pub fn reset_state_counter() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////////////////ASDFLKDJFLJ //////////////////////////////////////////////////////////
 
 #[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Symbol {
