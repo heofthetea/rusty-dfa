@@ -1,12 +1,11 @@
 use crate::automata::Symbol::CHAR;
+use crate::parse::parse;
 use bimap::BiMap;
 use std::any::type_name;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::thread::current;
-use crate::parse::parse;
-
 
 pub trait Automaton {
     /// Validate the `Automaton`
@@ -212,7 +211,7 @@ impl Nfa {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    pub fn to_finding(&self) -> Nfa{
+    pub fn to_finding(&self) -> Nfa {
         let mut nfa = self.clone();
         for state in &nfa.states {
             nfa.transitions
@@ -470,6 +469,7 @@ impl Dfa {
     /// Find all matches of the pattern represented by `self` in `input`.
     /// Returns an ordered vector of tuples `(start, end)`, where each tuple represents an individual match.
     /// Why am I using an ASM for this
+    /// note: `input` is in actuality reverse of the word we're searching, while `reversed` is the dfa describing the pattern in the correct orientation
     pub fn find_all(&self, input: &str, reversed: &Dfa) -> Option<Vec<(usize, usize)>> {
         print!("{:?}", self);
         println!("{:?}", reversed);
@@ -479,7 +479,10 @@ impl Dfa {
         }
         // We need to ensure we start the reversed match on the exact character of the respective end
         let cutoff = input.len() - ends.last().unwrap() - 1;
-        let ends_in_reverse: Vec<usize> = ends.iter().map(|pos| input.len() - *pos - 1 - cutoff).collect();
+        let ends_in_reverse: Vec<usize> = ends
+            .iter()
+            .map(|pos| input.len() - *pos - 1 - cutoff)
+            .collect();
         let mut ends_in_reverse = ends_in_reverse.iter().rev().peekable();
 
         // variables for matching automaton
@@ -510,18 +513,34 @@ impl Dfa {
 
             let transition_condition = (&state, reversed.q_accepting.contains(&current), is_end);
             match transition_condition {
-                (State::END, false, false) => {}
-                (State::END, false, true) => {if current_end.is_none() {current_end = Some(pos)}}
+                (_, false, false) => {}
+                (State::END, false, true) => {
+                    if current_end.is_none() {
+                        current_end = Some(pos)
+
+                    }
+                }
                 (State::END, true, _) => {
                     state = State::START;
                     best_start = Some(pos)
                 }
-                (State::START, _, false) => {
+                (State::START, true, false) => {
                     if !step_bro_im_stuck {
                         best_start = Some(pos)
                     }
                 }
-                (State::START, _, true) => {
+                (State::START, true, true) => {
+                    if !step_bro_im_stuck {
+                        best_start = Some(pos);
+                        continue;
+                    }
+                    pairs.push((current_end.unwrap() + cutoff, best_start.unwrap() + cutoff));
+                    current_end = Some(pos);
+                    current = reversed.q_start;
+                    state = State::END;
+                }
+                // only reset a match if the character is not a start, but an end => greediness (maybe)
+                (State::START, false, true) => {
                     pairs.push((current_end.unwrap() + cutoff, best_start.unwrap() + cutoff));
                     current_end = Some(pos);
                     current = reversed.q_start;
@@ -530,7 +549,9 @@ impl Dfa {
             }
         }
         // pairs.push((current_end?, best_start?));
-        if let Some(end) = current_end && let Some(start) = best_start {
+        if let Some(end) = current_end
+            && let Some(start) = best_start
+        {
             pairs.push((end + cutoff, start + cutoff));
         }
 
@@ -652,7 +673,6 @@ pub fn reset_state_counter() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 ////////////////////////////////////////////////ASDFLKDJFLJ //////////////////////////////////////////////////////////
 

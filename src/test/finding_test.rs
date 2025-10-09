@@ -44,9 +44,19 @@ pub mod test_finding {
 
     #[test]
     fn test_abba() {
-
+        let pattern = "a?b+a?";
+        assert_eq!(*find_all_with_dfa(pattern, "b").unwrap().first().unwrap(), (0, 0));
+        assert_eq!(*find_all_with_dfa(pattern, "ab").unwrap().first().unwrap(), (0, 1));
+        assert_eq!(*find_all_with_dfa(pattern, "ba").unwrap().first().unwrap(), (0, 1));
+        assert_eq!(*find_all_with_dfa(pattern, "aba").unwrap().first().unwrap(), (0, 2));
+        assert_eq!(*find_all_with_dfa(pattern, "abba").unwrap().first().unwrap(), (0, 3));
     }
 
+    #[test]
+    fn test_bplus() {
+        let pattern = "b+";
+        assert_eq!(*find_all_with_dfa(pattern, "bba").unwrap().first().unwrap(), (0, 1));
+    }
     #[test]
     fn test_find_with_precedence() {
         let pattern = "(a|b)c";
@@ -184,7 +194,9 @@ pub mod test_finding {
     fn test_mika() {
         let pattern = "aba";
         let input = "bababababa";
-        println!("{:?}", find_all_with_dfa(pattern, input));
+
+        // println!("{:?}", find_all_with_dfa(pattern, input));
+        assert_eq!(*find_all_with_dfa(pattern, "abababa").unwrap(), [(0, 2), (4, 6)]);
 
         // assert_eq!(dfa.find("aab", &dfa_reversed).unwrap(), (1, 2));
         // assert_eq!(dfa.find("aabbaa", &dfa_reversed).unwrap(), (1, 4));
