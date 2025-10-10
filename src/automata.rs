@@ -471,8 +471,8 @@ impl Dfa {
     /// Why am I using an ASM for this
     /// note: `input` is in actuality reverse of the word we're searching, while `reversed` is the dfa describing the pattern in the correct orientation
     pub fn find_all(&self, input: &str, reversed: &Dfa) -> Option<Vec<(usize, usize)>> {
-        print!("{:?}", self);
-        println!("{:?}", reversed);
+        // print!("{:?}", self);
+        // println!("{:?}", reversed);
         let ends = self._find_ends(input, true);
         if ends.is_empty() {
             return None;

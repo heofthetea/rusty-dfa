@@ -11,6 +11,6 @@ mod test;
 mod benchmark;
 
 fn main() {
-    benchmark_dfa_klenee(100000, 1000);
+    benchmark_dfa_klenee(20000, 100);
 
 }

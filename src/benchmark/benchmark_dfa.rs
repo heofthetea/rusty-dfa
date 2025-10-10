@@ -6,20 +6,20 @@ use crate::parse::parse;
 
 /// I think this behaves quadratically, so yay i guess at least better than exponential lol oops
 pub fn benchmark_dfa_klenee(max: usize, step_size: usize) {
-    let pattern = "ba*b";
+    let pattern = "a*";
     let before_parse = Instant::now();
     let (dfa, dfa_reversed) = build_finding_dfas(pattern);
     println!("construction: {:?}", before_parse.elapsed());
 
     let mut times: Vec<Duration> = Vec::new();
     for i in (1..=(max + 1)).step_by(step_size) {
-        let mut word = String::from("b");
+        let mut word = String::from("");
         word.extend("a".repeat(i).chars());
-        word.push('b');
+        // word.push('b');
         let before_match = Instant::now();
         let found_match = dfa.find(&word, &dfa_reversed);
         times.push(before_match.elapsed());
-        assert_eq!(found_match, Some((0, i + 1)));
+        assert_eq!(found_match, Some((0, i - 1)));
         println!("{}: {:?}", i, times.last().unwrap())
     }
     export_benchmark_to_csv("dfa_klenee.csv", times, step_size);

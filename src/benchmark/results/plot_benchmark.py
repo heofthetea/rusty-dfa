@@ -20,7 +20,7 @@ def main():
     # Customize the plot
     plt.xlabel('Number of Characters', fontsize=12)
     plt.ylabel('Duration (seconds)', fontsize=12)
-    plt.title('Benchmark Results: Duration vs Number of Characters', fontsize=14, fontweight='bold')
+    plt.title('Benchmark Results: Duration vs Number of Characters matching a{n} against a*', fontsize=14, fontweight='bold')
     plt.grid(True, alpha=0.3)
 
     # Add some statistics to the plot
